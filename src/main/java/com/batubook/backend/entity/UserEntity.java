@@ -2,37 +2,42 @@ package com.batubook.backend.entity;
 
 import com.batubook.backend.entity.enums.Role;
 import jakarta.persistence.*;
-import lombok.AllArgsConstructor;
-import lombok.Builder;
-import lombok.Data;
-import lombok.NoArgsConstructor;
+import jakarta.validation.constraints.*;
+import lombok.*;
 
-import java.time.LocalDateTime;
+import java.util.Set;
 
 @Entity
 @Table(name = "users")
 @Data
+@EqualsAndHashCode(callSuper = true)
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
-public class UserEntity {
+public class UserEntity extends BaseEntity {
+
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
     @Column(nullable = false, unique = true)
+    @NotBlank(message = "Username cannot be empty.")
+    @Size(min = 4, max = 16, message = "Username must be between 4 and 16 characters.")
+    @Pattern(regexp = "^\\S.*\\S$", message = "Username cannot have leading or trailing spaces.")
     private String username;
 
     @Column(nullable = false, unique = true)
+    @NotBlank(message = "User Email cannot be empty.")
+    @Size(min = 6, max = 255, message = "User Email must be between 6 and 255 characters.")
+    @Pattern(regexp = "^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}$", message = "Email should be valid.")
+    @Email(message = "Email should be valid.")
     private String email;
 
     @Column(nullable = false)
+    @NotBlank(message = "Password cannot be empty.")
+    @Size(min = 8, max = 16, message = "Password must be between 8 and 16 characters.")
+    @Pattern(regexp = "^(?=.*[a-z])(?=.*[A-Z])(?=.*\\d)(?=.*[!@#$%^&*()_+=\\[\\]{};:'\",<>./?~`|]).+$", message = "Password must contain at least one lowercase letter, one uppercase letter, one number, and one special character.")
     private String password;
-
-    @Column(nullable = false, updatable = false)
-    private LocalDateTime createdAt;
-
-    private LocalDateTime updatedAt;
 
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)
@@ -41,14 +46,31 @@ public class UserEntity {
     @OneToOne(mappedBy = "user", cascade = CascadeType.ALL, orphanRemoval = true)
     private UserProfileEntity userProfile;
 
-    @PrePersist
-    public void prePersist() {
-        this.createdAt = LocalDateTime.now();
-        this.updatedAt = LocalDateTime.now();
-    }
+    @OneToMany(mappedBy = "user", cascade = CascadeType.ALL, orphanRemoval = true)
+    private Set<ReviewEntity> reviews;
 
+    @OneToMany(mappedBy = "user", cascade = CascadeType.ALL, orphanRemoval = true)
+    private Set<QuoteEntity> quotes;
+
+    @OneToMany(mappedBy = "sender", cascade = CascadeType.ALL, orphanRemoval = true)
+    private Set<MessageEntity> sentMessages;
+
+    @OneToMany(mappedBy = "receiver", cascade = CascadeType.ALL, orphanRemoval = true)
+    private Set<MessageEntity> receivedMessages;
+
+    @PrePersist
     @PreUpdate
-    public void preUpdate() {
-        this.updatedAt = LocalDateTime.now();
+    public void preProcess() {
+        if (this.username != null) {
+            this.username = this.username.trim().toLowerCase();
+        }
+
+        if (this.email != null) {
+            this.email = this.email.trim().toLowerCase();
+        }
+
+        if (this.password != null) {
+            this.password = this.password.trim();
+        }
     }
 }
