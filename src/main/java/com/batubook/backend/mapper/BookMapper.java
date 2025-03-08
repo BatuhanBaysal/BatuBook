@@ -11,11 +11,11 @@ import org.mapstruct.Mapping;
 public interface BookMapper {
 
     @Mapping(target = "genre", source = "genre")
-    @Mapping(target = "publishYear", expression = "java(String.valueOf(bookEntity.getPublishDate().getYear()))")
+    @Mapping(target = "publishDate", expression = "java(String.valueOf(bookEntity.getPublishDate().getYear()))")
     BookDTO bookEntityToBookDTO(BookEntity bookEntity);
 
     @Mapping(target = "genre", source = "genre")
-    @Mapping(target = "publishDate", expression = "java(java.time.LocalDate.of(Integer.parseInt(bookDTO.getPublishYear()), 1, 1))")
+    @Mapping(target = "publishDate", expression = "java(java.time.LocalDate.of(Integer.parseInt(bookDTO.getPublishDate()), 1, 1))")
     BookEntity bookDTOToBookEntity(BookDTO bookDTO);
 
     default Genre mapStringToGenre(String genreString) {
