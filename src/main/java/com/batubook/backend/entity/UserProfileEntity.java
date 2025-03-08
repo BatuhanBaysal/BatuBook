@@ -49,8 +49,8 @@ public class UserProfileEntity extends BaseEntity {
     @Size(min = 2, max = 64, message = "User Education information must be between 2 and 64 characters.")
     private String education;
 
-    @OneToOne
-    @JoinColumn(name = "user_id", nullable = false, unique = true)
+    @OneToOne(cascade = CascadeType.PERSIST)
+    @JoinColumn(name = "user_id", nullable = false)
     private UserEntity user;
 
     @PrePersist
