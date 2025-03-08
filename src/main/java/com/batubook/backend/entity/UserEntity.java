@@ -35,7 +35,7 @@ public class UserEntity extends BaseEntity {
 
     @Column(nullable = false)
     @NotBlank(message = "Password cannot be empty.")
-    @Size(min = 8, max = 16, message = "Password must be between 8 and 16 characters.")
+    @Size(min = 8, max = 256, message = "Password must be between 8 and 256 characters.")
     @Pattern(regexp = "^(?=.*[a-z])(?=.*[A-Z])(?=.*\\d)(?=.*[!@#$%^&*()_+=\\[\\]{};:'\",<>./?~`|]).+$", message = "Password must contain at least one lowercase letter, one uppercase letter, one number, and one special character.")
     private String password;
 
@@ -46,16 +46,16 @@ public class UserEntity extends BaseEntity {
     @OneToOne(mappedBy = "user", cascade = CascadeType.ALL, orphanRemoval = true)
     private UserProfileEntity userProfile;
 
-    @OneToMany(mappedBy = "user", cascade = CascadeType.ALL, orphanRemoval = true)
+    @OneToMany(mappedBy = "user", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.EAGER)
     private Set<ReviewEntity> reviews;
 
-    @OneToMany(mappedBy = "user", cascade = CascadeType.ALL, orphanRemoval = true)
+    @OneToMany(mappedBy = "user", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.EAGER)
     private Set<QuoteEntity> quotes;
 
-    @OneToMany(mappedBy = "sender", cascade = CascadeType.ALL, orphanRemoval = true)
+    @OneToMany(mappedBy = "sender", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.EAGER)
     private Set<MessageEntity> sentMessages;
 
-    @OneToMany(mappedBy = "receiver", cascade = CascadeType.ALL, orphanRemoval = true)
+    @OneToMany(mappedBy = "receiver", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.EAGER)
     private Set<MessageEntity> receivedMessages;
 
     @PrePersist
