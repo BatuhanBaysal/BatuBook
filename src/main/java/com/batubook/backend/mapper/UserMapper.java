@@ -5,25 +5,28 @@ import com.batubook.backend.entity.UserEntity;
 import com.batubook.backend.entity.enums.Role;
 import org.mapstruct.Mapper;
 import org.mapstruct.Mapping;
-import org.mapstruct.factory.Mappers;
 
 @Mapper(componentModel = "spring",
         uses = { UserProfileMapper.class, QuoteMapper.class, ReviewMapper.class, MessageMapper.class })
 public interface UserMapper {
 
-    UserMapper INSTANCE = Mappers.getMapper(UserMapper.class);
-
-    @Mapping(target = "role", source = "role.name")
+    @Mapping(target = "password", ignore = true)
+    @Mapping(target = "role", expression = "java(userEntity.getRole().name())")
     UserDTO userEntityToUserDTO(UserEntity userEntity);
 
-    @Mapping(target = "role", source = "role")
+    @Mapping(target = "password", ignore = true)
+    @Mapping(target = "role", expression = "java(mapStringToRole(userDTO.getRole()))")
     UserEntity userDTOToUserEntity(UserDTO userDTO);
 
     default Role mapStringToRole(String roleString) {
-        return roleString != null ? Role.valueOf(roleString.toUpperCase()) : null;
+        try {
+            return roleString != null ? Role.valueOf(roleString.toUpperCase()) : Role.USER;
+        } catch (IllegalArgumentException e) {
+            return Role.USER;
+        }
     }
 
     default String mapRoleToString(Role role) {
-        return role != null ? role.name().toLowerCase() : null;
+        return role != null ? role.name().toUpperCase() : "USER";
     }
 }
