@@ -1,6 +1,7 @@
 package com.batubook.backend.entity;
 
 import com.batubook.backend.entity.enums.Role;
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import jakarta.persistence.*;
 import jakarta.validation.constraints.*;
 import lombok.*;
@@ -10,7 +11,7 @@ import java.util.Set;
 @Entity
 @Table(name = "users")
 @Data
-@EqualsAndHashCode(callSuper = true)
+@EqualsAndHashCode(callSuper = true, exclude = {"userProfile", "reviews", "quotes", "sentMessages", "receivedMessages"})
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
@@ -21,41 +22,46 @@ public class UserEntity extends BaseEntity {
     private Long id;
 
     @Column(nullable = false, unique = true)
-    @NotBlank(message = "Username cannot be empty.")
+    @NotBlank(message = "Username cannot be empty or contain only spaces.")
     @Size(min = 4, max = 16, message = "Username must be between 4 and 16 characters.")
     @Pattern(regexp = "^\\S.*\\S$", message = "Username cannot have leading or trailing spaces.")
     private String username;
 
     @Column(nullable = false, unique = true)
-    @NotBlank(message = "User Email cannot be empty.")
-    @Size(min = 6, max = 255, message = "User Email must be between 6 and 255 characters.")
+    @NotBlank(message = "User Email cannot be empty or contain only spaces.")
+    @Size(min = 8, max = 256, message = "User Email must be between 8 and 256 characters.")
     @Pattern(regexp = "^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}$", message = "Email should be valid.")
     @Email(message = "Email should be valid.")
     private String email;
 
     @Column(nullable = false)
-    @NotBlank(message = "Password cannot be empty.")
+    @NotBlank(message = "Password cannot be empty or contain only spaces.")
     @Size(min = 8, max = 256, message = "Password must be between 8 and 256 characters.")
     @Pattern(regexp = "^(?=.*[a-z])(?=.*[A-Z])(?=.*\\d)(?=.*[!@#$%^&*()_+=\\[\\]{};:'\",<>./?~`|]).+$", message = "Password must contain at least one lowercase letter, one uppercase letter, one number, and one special character.")
+    @JsonIgnore
     private String password;
 
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)
     private Role role = Role.USER;
 
-    @OneToOne(mappedBy = "user", cascade = CascadeType.ALL, orphanRemoval = true)
+    @OneToOne(mappedBy = "user", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.LAZY)
     private UserProfileEntity userProfile;
 
-    @OneToMany(mappedBy = "user", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.EAGER)
+    @OneToMany(mappedBy = "user", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.LAZY)
+    @JsonIgnore
     private Set<ReviewEntity> reviews;
 
-    @OneToMany(mappedBy = "user", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.EAGER)
+    @OneToMany(mappedBy = "user", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.LAZY)
+    @JsonIgnore
     private Set<QuoteEntity> quotes;
 
-    @OneToMany(mappedBy = "sender", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.EAGER)
+    @OneToMany(mappedBy = "sender", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.LAZY)
+    @JsonIgnore
     private Set<MessageEntity> sentMessages;
 
-    @OneToMany(mappedBy = "receiver", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.EAGER)
+    @OneToMany(mappedBy = "receiver", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.LAZY)
+    @JsonIgnore
     private Set<MessageEntity> receivedMessages;
 
     @PrePersist
