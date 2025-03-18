@@ -7,6 +7,9 @@ import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.web.PageableDefault;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
@@ -15,7 +18,6 @@ import java.util.List;
 @RestController
 @RequestMapping("/api/users")
 @RequiredArgsConstructor
-@CrossOrigin("*")
 public class UserController {
 
     private final UserServiceInterface userService;
@@ -23,105 +25,71 @@ public class UserController {
 
     @PostMapping("/createUser")
     public ResponseEntity<UserDTO> createUser(@Valid @RequestBody UserDTO userDTO) {
-        try {
-            logger.info("Creating user: {}", userDTO.getUsername());
-            UserDTO createUserDTO = userService.createUser(userDTO);
-            logger.info("User created successfully: {}", userDTO.getUsername());
-            return ResponseEntity.ok(createUserDTO);
-        } catch (Exception e) {
-            logger.error("Error occurred while creating user: {}", userDTO.getUsername(), e);
-            throw e;
-        }
+        logger.info("Creating user: {}", userDTO.getUsername());
+        UserDTO createdUser = userService.registerUser(userDTO);
+        logger.info("User created successfully: {}", userDTO.getUsername());
+        return ResponseEntity.status(201).body(createdUser);
     }
 
     @GetMapping("/userId/{id}")
-    public ResponseEntity<UserDTO> getUserById(@PathVariable Long id) {
-        try {
-            logger.info("Fetching user with ID: {}", id);
-            UserDTO userDTO = userService.getUserById(id);
-            logger.info("Successfully retrieved user with ID: {}", id);
-            return ResponseEntity.ok(userDTO);
-        } catch (Exception e) {
-            logger.error("Error occurred while fetching user with ID: {}", id, e);
-            throw e;
-        }
+    public ResponseEntity<UserDTO> fetchUserById(@PathVariable Long id) {
+        logger.info("Fetching user with ID: {}", id);
+        UserDTO userDTO = userService.getUserById(id);
+        logger.info("Successfully retrieved user with ID: {}", id);
+        return ResponseEntity.ok(userDTO);
     }
 
     @GetMapping("/allUsers")
-    public ResponseEntity<List<UserDTO>> getAllUsers() {
-        try {
-            logger.info("Fetching all users");
-            List<UserDTO> users = userService.getAllUsers();
-            logger.info("Successfully fetched {} users.", users.size());
-            return ResponseEntity.ok(users);
-        } catch (Exception e) {
-            logger.error("Error occurred while fetching all users: {}", e.getMessage(), e);
-            throw e;
-        }
-    }
-
-    @GetMapping("/userRole/{role}")
-    public ResponseEntity<List<UserDTO>> getUsersByRole(@PathVariable String role) {
-        try {
-            logger.info("Fetching users with role: {}", role);
-            List<UserDTO> users = userService.getUsersByRole(Role.valueOf(role.toUpperCase()));
-            logger.info("Successfully fetched {} users with role {}", users.size(), role);
-            return ResponseEntity.ok(users);
-        } catch (Exception e) {
-            logger.error("Error occurred while fetching users by role {}: {}", role, e.getMessage(), e);
-            throw e;
-        }
-    }
-
-    @GetMapping("/search")
-    public ResponseEntity<List<UserDTO>> searchUser(@RequestParam String searchTerm) {
-        try {
-            logger.info("Searching users with term: {}", searchTerm);
-            List<UserDTO> users = userService.searchUser(searchTerm);
-            logger.info("Successfully found {} users for search term: {}", users.size(), searchTerm);
-            return ResponseEntity.ok(users);
-        } catch (Exception e) {
-            logger.error("Error occurred while searching users with term {}: {}", searchTerm, e.getMessage(), e);
-            throw e;
-        }
+    public ResponseEntity<Page<UserDTO>> fetchAllUsers(@PageableDefault(size = 10) Pageable pageable) {
+        logger.info("Fetching all users");
+        Page<UserDTO> users = userService.getAllUsers(pageable);
+        logger.info("Successfully fetched all users");
+        return ResponseEntity.ok(users);
     }
 
     @GetMapping("/search-username-email")
-    public ResponseEntity<List<UserDTO>> getUsersByUsernameAndEmail(@RequestParam String username, @RequestParam String email) {
-        try {
-            logger.info("Fetching users for username: {} and email: {}", username, email);
-            List<UserDTO> users = userService.getUsersByUsernameAndEmail(username, email);
-            logger.info("Successfully fetched {} users for username: {} and email: {}", users.size(), username, email);
-            return ResponseEntity.ok(users);
-        } catch (Exception e) {
-            logger.error("Error occurred while fetching users for username: {} and email: {}: {}", username, email, e.getMessage(), e);
-            throw e;
-        }
+    public ResponseEntity<Page<UserDTO>> fetchUsersByUsernameAndEmail(
+            @RequestParam String username,
+            @RequestParam String email,
+            @PageableDefault(size = 10) Pageable pageable) {
+        logger.info("Fetching users for username: {} and email: {}", username, email);
+        Page<UserDTO> users = userService.getUsersByUsernameAndEmail(username, email, pageable);
+        logger.info("Successfully fetched users for username: {} and email: {}", username, email);
+        return ResponseEntity.ok(users);
+    }
+
+    @GetMapping("/search-role")
+    public ResponseEntity<Page<UserDTO>> fetchUsersByRole(
+            @RequestParam String role,
+            @PageableDefault(size = 10) Pageable pageable) {
+        logger.info("Fetching users with role: {}", role);
+        Role roleEnum = Role.fromString(role);
+        Page<UserDTO> users = userService.getUsersByRole(roleEnum, pageable);
+        logger.info("Successfully fetched {} users with role: {}", users.getSize(), roleEnum);
+        return ResponseEntity.ok(users);
+    }
+
+    @GetMapping("/search-Term")
+    public ResponseEntity<List<UserDTO>> fetchSearchUser(@RequestParam String searchTerm) {
+        logger.info("Searching users with term: {}", searchTerm);
+        List<UserDTO> users = userService.searchUser(searchTerm);
+        logger.info("Successfully found {} users for search term: {}", users.size(), searchTerm);
+        return ResponseEntity.ok(users);
     }
 
     @PutMapping("/updateUser/{id}")
     public ResponseEntity<UserDTO> updateUser(@PathVariable Long id, @Valid @RequestBody UserDTO userDTO) {
-        try {
-            logger.info("Updating user with ID: {}", id);
-            UserDTO updatedUser = userService.updateUser(id, userDTO);
-            logger.info("Successfully updated user with ID: {}", id);
-            return ResponseEntity.ok(updatedUser);
-        } catch (Exception e) {
-            logger.error("Error occurred while updating user with ID: {}", id, e);
-            throw e;
-        }
+        logger.info("Updating user with ID: {}", id);
+        UserDTO updatedUser = userService.modifyUser(id, userDTO);
+        logger.info("Successfully updated user with ID: {}", id);
+        return ResponseEntity.ok(updatedUser);
     }
 
     @DeleteMapping("/deleteUser/{id}")
     public ResponseEntity<Void> deleteUser(@PathVariable Long id) {
-        try {
-            logger.info("Deleting user with ID: {}", id);
-            userService.deleteUserById(id);
-            logger.info("Successfully deleted user with ID: {}", id);
-            return ResponseEntity.noContent().build();
-        } catch (Exception e) {
-            logger.error("Error occurred while deleting user with ID: {}", id, e);
-            throw e;
-        }
+        logger.info("Deleting user with ID: {}", id);
+        userService.removeUserById(id);
+        logger.info("Successfully deleted user with ID: {}", id);
+        return ResponseEntity.noContent().build();
     }
 }
