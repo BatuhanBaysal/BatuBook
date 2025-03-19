@@ -8,11 +8,10 @@ import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Repository;
 
 import java.time.LocalDate;
-import java.util.List;
 
 @Repository
 public interface UserProfileRepository extends JpaRepository<UserProfileEntity, Long> {
 
-    List<UserProfileEntity> findByDateOfBirth(LocalDate dateOfBirth);
+    Page<UserProfileEntity> findByDateOfBirth(LocalDate dateOfBirth, Pageable pageable);
     Page<UserProfileEntity> findByGender(Gender gender, Pageable pageable);
 }
