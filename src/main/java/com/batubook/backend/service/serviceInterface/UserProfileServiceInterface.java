@@ -6,14 +6,13 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 
 import java.time.LocalDate;
-import java.util.List;
 
 public interface UserProfileServiceInterface {
 
     UserProfileDTO getUserProfileById(Long id);
-    List<UserProfileDTO> getAllUserProfiles();
-    List<UserProfileDTO> getUserProfilesByDateOfBirth(LocalDate dateOfBirth);
+    Page<UserProfileDTO> getAllUserProfiles(Pageable pageable);
+    Page<UserProfileDTO> getUserProfilesByDateOfBirth(LocalDate dateOfBirth, Pageable pageable);
     Page<UserProfileDTO> getUserProfilesByGender(Gender gender, Pageable pageable);
-    UserProfileDTO updateUserProfile(Long id, UserProfileDTO userProfileDTO);
-    void deleteUserProfileById(Long userId);
+    UserProfileDTO modifyUserProfile(Long id, UserProfileDTO userProfileDTO);
+    void removeUserProfileById(Long userId);
 }
