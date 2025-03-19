@@ -13,10 +13,12 @@ import lombok.NoArgsConstructor;
 public class UserProfileDTO {
 
     private Long id;
+    private String profileImageUrl;
     private String dateOfBirth;
     private Gender gender;
     private String biography;
     private String location;
     private String occupation;
     private String education;
+    private String interests;
 }
