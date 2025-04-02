@@ -47,7 +47,7 @@ public class BookSalesEntity extends BaseEntity {
     private Double discount;
 
     @Column(nullable = false)
-    private boolean isAvailable = true;
+    private Boolean isAvailable = true;
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "book_id", nullable = false)
