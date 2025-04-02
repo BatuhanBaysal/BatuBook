@@ -14,7 +14,7 @@ import java.time.LocalDate;
 @Entity
 @Table(name = "user_profiles")
 @Data
-@EqualsAndHashCode(callSuper = true, exclude = {"user"})
+@EqualsAndHashCode(callSuper = true)
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
