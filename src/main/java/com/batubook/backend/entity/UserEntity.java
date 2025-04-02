@@ -11,7 +11,10 @@ import java.util.Set;
 @Entity
 @Table(name = "users")
 @Data
-@EqualsAndHashCode(callSuper = true, exclude = {"userProfile", "reviews", "quotes", "sentMessages", "receivedMessages"})
+@EqualsAndHashCode(callSuper = true, exclude = {
+        "userProfile", "reviews", "quotes", "sentMessages", "receivedMessages",
+        "followers", "followingUsers", "bookInteractions", "repostSaves"
+})
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
@@ -37,7 +40,10 @@ public class UserEntity extends BaseEntity {
     @Column(nullable = false)
     @NotBlank(message = "Password cannot be empty or contain only spaces.")
     @Size(min = 8, max = 256, message = "Password must be between 8 and 256 characters.")
-    @Pattern(regexp = "^(?=.*[a-z])(?=.*[A-Z])(?=.*\\d)(?=.*[!@#$%^&*()_+=\\[\\]{};:'\",<>./?~`|]).+$", message = "Password must contain at least one lowercase letter, one uppercase letter, one number, and one special character.")
+    @Pattern(
+            regexp = "^(?!\\s)(?=.*[a-z])(?=.*[A-Z])(?=.*\\d)(?=.*[!@#$%^&*()_+=\\[\\]{};:'\",<>./?~`|]).{8,256}(?<!\\s)$",
+            message = "Password must be between 8-256 characters, contain at least one lowercase letter, one uppercase letter, one number, one special character, and cannot start or end with a space."
+    )
     @JsonIgnore
     private String password;
 
@@ -63,6 +69,22 @@ public class UserEntity extends BaseEntity {
     @OneToMany(mappedBy = "receiver", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.LAZY)
     @JsonIgnore
     private Set<MessageEntity> receivedMessages;
+
+    @OneToMany(mappedBy = "followedUser", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.LAZY)
+    @JsonIgnore
+    private Set<FollowEntity> followers;
+
+    @OneToMany(mappedBy = "follower", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.LAZY)
+    @JsonIgnore
+    private Set<FollowEntity> followingUsers;
+
+    @OneToMany(mappedBy = "user", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.LAZY)
+    @JsonIgnore
+    private Set<BookInteractionEntity> bookInteractions;
+
+    @OneToMany(mappedBy = "user", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.LAZY)
+    @JsonIgnore
+    private Set<RepostSaveEntity> repostSaves;
 
     @PrePersist
     @PreUpdate
