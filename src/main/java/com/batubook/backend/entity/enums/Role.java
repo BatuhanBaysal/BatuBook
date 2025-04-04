@@ -5,6 +5,9 @@ import com.fasterxml.jackson.annotation.JsonValue;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.util.Arrays;
+import java.util.Locale;
+
 public enum Role {
 
     ADMIN, USER;
@@ -17,12 +20,13 @@ public enum Role {
             return USER;
         }
 
-        try {
-            return Role.valueOf(value.toUpperCase());
-        } catch (IllegalArgumentException e) {
-            logger.error("Invalid role value: {}", value);
-            return USER;
-        }
+        return Arrays.stream(Role.values())
+                .filter(mt -> mt.name().equalsIgnoreCase(value.toUpperCase(Locale.ROOT)))
+                .findFirst()
+                .orElseThrow(() -> {
+                    logger.error("Invalid Role value: {}", value);
+                    return new RuntimeException("Invalid Role value: " + value);
+                });
     }
 
     @JsonValue
