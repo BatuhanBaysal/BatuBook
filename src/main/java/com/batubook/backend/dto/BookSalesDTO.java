@@ -19,6 +19,6 @@ public class BookSalesDTO {
     private Integer stockQuantity;
     private BookSalesEntity.Currency currency;
     private Double discount;
-    private boolean isAvailable;
+    private Boolean isAvailable;
     private Long bookId;
 }
