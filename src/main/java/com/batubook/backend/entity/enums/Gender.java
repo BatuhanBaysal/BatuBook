@@ -5,6 +5,9 @@ import com.fasterxml.jackson.annotation.JsonValue;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.util.Arrays;
+import java.util.Locale;
+
 public enum Gender {
 
     MALE, FEMALE, UNDISCLOSED;
@@ -17,12 +20,13 @@ public enum Gender {
             return UNDISCLOSED;
         }
 
-        try {
-            return Gender.valueOf(value.toUpperCase());
-        } catch (IllegalArgumentException e) {
-            logger.error("Invalid gender value: {}", value);
-            return UNDISCLOSED;
-        }
+        return Arrays.stream(Gender.values())
+                .filter(mt -> mt.name().equalsIgnoreCase(value.toUpperCase(Locale.ROOT)))
+                .findFirst()
+                .orElseThrow(() -> {
+                    logger.error("Invalid Gender value: {}", value);
+                    return new RuntimeException("Invalid Gender value: " + value);
+                });
     }
 
     @JsonValue
