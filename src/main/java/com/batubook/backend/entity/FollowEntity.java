@@ -5,7 +5,8 @@ import lombok.*;
 
 @Entity
 @Table(name = "follows", uniqueConstraints = {
-        @UniqueConstraint(columnNames = {"follower_id", "followed_user_id"})
+        @UniqueConstraint(columnNames = {"follower_id", "followed_user_id"}),
+        @UniqueConstraint(columnNames = {"follower_id", "followed_book_id"})
 })
 @Data
 @EqualsAndHashCode(callSuper = true)
