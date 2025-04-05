@@ -6,6 +6,7 @@ import com.batubook.backend.entity.FollowEntity;
 import com.batubook.backend.entity.UserEntity;
 import org.mapstruct.Mapper;
 import org.mapstruct.Mapping;
+import org.mapstruct.Named;
 
 @Mapper(componentModel = "spring")
 public interface FollowMapper {
@@ -13,30 +14,26 @@ public interface FollowMapper {
     @Mapping(target = "followerId", source = "follower.id")
     @Mapping(target = "followedUserId", source = "followedUser.id")
     @Mapping(target = "followedBookId", source = "followedBook.id")
-    FollowDTO followEntityToFollowDTO(FollowEntity followEntity);
+    FollowDTO followEntityToDTO(FollowEntity followEntity);
 
-    @Mapping(target = "follower", source = "followerId")
-    @Mapping(target = "followedUser", source = "followedUserId")
-    @Mapping(target = "followedBook", source = "followedBookId")
-    FollowEntity followDTOToFollowEntity(FollowDTO followDTO);
+    @Mapping(target = "follower", source = "followerId", qualifiedByName = "mapUser")
+    @Mapping(target = "followedUser", source = "followedUserId", qualifiedByName = "mapUser")
+    @Mapping(target = "followedBook", source = "followedBookId", qualifiedByName = "mapBook")
+    FollowEntity followDTOToEntity(FollowDTO followDTO);
 
-    default UserEntity map(Long value) {
-        if (value == null) {
-            return null;
-        }
-
-        UserEntity userEntity = new UserEntity();
-        userEntity.setId(value);
-        return userEntity;
+    @Named("mapUser")
+    default UserEntity mapUser(Long id) {
+        if (id == null) return null;
+        UserEntity user = new UserEntity();
+        user.setId(id);
+        return user;
     }
 
-    default BookEntity mapBook(Long value) {
-        if (value == null) {
-            return null;
-        }
-
-        BookEntity bookEntity = new BookEntity();
-        bookEntity.setId(value);
-        return bookEntity;
+    @Named("mapBook")
+    default BookEntity mapBook(Long id) {
+        if (id == null) return null;
+        BookEntity book = new BookEntity();
+        book.setId(id);
+        return book;
     }
 }
