@@ -8,11 +8,9 @@ import org.mapstruct.Mapping;
 @Mapper(componentModel = "spring")
 public interface UserProfileMapper {
 
-    @Mapping(target = "gender", source = "gender")
     @Mapping(target = "dateOfBirth", source = "dateOfBirth", dateFormat = "yyyy-MM-dd")
-    UserProfileDTO userProfileEntityToUserProfileDTO(UserProfileEntity userProfileEntity);
+    UserProfileDTO userProfileEntityToDTO(UserProfileEntity userProfileEntity);
 
-    @Mapping(target = "gender", source = "gender")
     @Mapping(target = "dateOfBirth", source = "dateOfBirth", dateFormat = "yyyy-MM-dd")
-    UserProfileEntity userProfileDTOToUserProfileEntity(UserProfileDTO userProfileDTO);
+    UserProfileEntity userProfileDTOToEntity(UserProfileDTO userProfileDTO);
 }
