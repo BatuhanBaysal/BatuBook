@@ -4,6 +4,7 @@ import com.batubook.backend.dto.ReviewDTO;
 import com.batubook.backend.entity.BookEntity;
 import com.batubook.backend.entity.ReviewEntity;
 import com.batubook.backend.entity.UserEntity;
+import com.batubook.backend.exception.CustomExceptions;
 import com.batubook.backend.mapper.ReviewMapper;
 import com.batubook.backend.repository.BookRepository;
 import com.batubook.backend.repository.ReviewRepository;
@@ -26,14 +27,14 @@ public class ReviewServiceImpl implements ReviewServiceInterface {
 
     private final ReviewRepository reviewRepository;
     private final ReviewMapper reviewMapper;
-    private final UserRepository userRepository;
-    private final BookRepository bookRepository;
     private static final Logger logger = LoggerFactory.getLogger(ReviewServiceImpl.class);
 
-    @Transactional
-    @Override
-    public ReviewDTO createReview(ReviewDTO reviewDTO) {
+    private final UserRepository userRepository;
+    private final BookRepository bookRepository;
 
+    @Override
+    @Transactional
+    public ReviewDTO registerReview(ReviewDTO reviewDTO) {
         logger.info("Creating a new Review. Provided ID (if any): {}", reviewDTO.getId());
         try {
             UserEntity userEntity = userRepository.findById(reviewDTO.getUserId())
@@ -42,77 +43,59 @@ public class ReviewServiceImpl implements ReviewServiceInterface {
             BookEntity bookEntity = bookRepository.findById(reviewDTO.getBookId())
                     .orElseThrow(() -> new IllegalArgumentException("Book not found with ID: " + reviewDTO.getBookId()));
 
-            ReviewEntity reviewEntity = reviewMapper.reviewDTOToReviewEntity(reviewDTO);
+            ReviewEntity reviewEntity = reviewMapper.reviewDTOToEntity(reviewDTO);
             reviewEntity.setUser(userEntity);
             reviewEntity.setBook(bookEntity);
             logger.debug("Converted ReviewDTO to ReviewEntity: {}", reviewEntity);
 
             ReviewEntity savedReview = reviewRepository.save(reviewEntity);
             logger.info("Review saved successfully with ID: {}", savedReview.getId());
-            return reviewMapper.reviewEntityToReviewDTO(savedReview);
-        } catch (IllegalArgumentException e) {
-            logger.error("Invalid input provided: {}", e.getMessage());
+            return reviewMapper.reviewEntityToDTO(savedReview);
+
+        } catch (CustomExceptions.BadRequestException e) {
+            logger.error("Bad Request Error: {}", e.getMessage());
             throw e;
         } catch (Exception e) {
-            logger.error("Error occurred while creating the review: {}", e.getMessage(), e);
-            throw new RuntimeException("Error occurred while creating the review", e);
+            logger.error("Error while creating review: {}", e.getMessage());
+            throw new CustomExceptions.InternalServerErrorException("Review could not be created: " + e.getMessage());
         }
     }
 
     @Override
+    @Transactional(readOnly = true)
     public ReviewDTO getReviewById(Long id) {
+        logger.info("Attempting to retrieve review with ID: {}", id);
+        ReviewEntity reviewEntity = reviewRepository.findById(id)
+                .orElseThrow(() -> {
+                    logger.warn("Review not found with ID: {}", id);
+                    return new EntityNotFoundException("Review with ID " + id + " not found");
+                });
 
-        logger.info("Fetching review with ID: {}", id);
-        try {
-            ReviewEntity review = reviewRepository.findById(id)
-                    .orElseThrow(() -> new EntityNotFoundException("Review with ID " + id + " not found"));
-
-            return reviewMapper.reviewEntityToReviewDTO(review);
-        } catch (EntityNotFoundException e) {
-            logger.error("Error: {}", e.getMessage());
-            throw e;
-        } catch (Exception e) {
-            logger.error("Error occurred while fetching review with ID {}: {}", id, e.getMessage(), e);
-            throw new RuntimeException("Error occurred while fetching review", e);
-        }
+        logger.info("Successfully retrieved review with ID: {}", id);
+        return reviewMapper.reviewEntityToDTO(reviewEntity);
     }
 
     @Override
+    @Transactional(readOnly = true)
     public Page<ReviewDTO> getAllReviews(Pageable pageable) {
-
-        logger.info("Fetching all reviews with pagination: page={}, size={}", pageable.getPageNumber(), pageable.getPageSize());
-        try {
-            Page<ReviewEntity> reviews = reviewRepository.findAll(pageable);
-            logger.info("Successfully fetched {} reviews", reviews.getTotalElements());
-            return reviews.map(reviewMapper::reviewEntityToReviewDTO);
-        } catch (Exception e) {
-            logger.error("Error occurred while fetching all reviews: {}", e.getMessage(), e);
-            throw new RuntimeException("Error occurred while fetching all reviews", e);
-        }
+        logger.debug("Fetching all reviews with pagination: page = {}, size = {}", pageable.getPageNumber(), pageable.getPageSize());
+        Page<ReviewEntity> allReviews = reviewRepository.findAll(pageable);
+        logger.info("Successfully fetched {} reviews", allReviews.getNumberOfElements());
+        return allReviews.map(reviewMapper::reviewEntityToDTO);
     }
 
     @Override
+    @Transactional(readOnly = true)
     public Page<ReviewDTO> getReviewByRating(BigDecimal rating, Pageable pageable) {
-
-        try {
-            Page<ReviewEntity> reviews = reviewRepository.findByRating(rating, pageable);
-            if (reviews.isEmpty()) {
-                logger.warn("No reviews found with rating: {}", rating);
-            } else {
-                logger.info("Successfully fetched reviews with rating: {}", rating);
-            }
-
-            return reviews.map(reviewMapper::reviewEntityToReviewDTO);
-        } catch (Exception e) {
-            logger.error("Error occurred while fetching reviews with rating: {}", rating, e);
-            throw new RuntimeException("Error occurred while fetching reviews by rating", e);
-        }
+        logger.info("Fetching reviews with rating: {}", rating);
+        Page<ReviewEntity> reviews = reviewRepository.findByRating(rating, pageable);
+        logger.info("Successfully fetched {} reviews with rating: {}", reviews.getTotalElements(), rating);
+        return reviews.map(reviewMapper::reviewEntityToDTO);
     }
 
-    @Transactional
     @Override
-    public ReviewDTO updateReview(Long id, ReviewDTO reviewDTO) {
-
+    @Transactional
+    public ReviewDTO modifyReview(Long id, ReviewDTO reviewDTO) {
         logger.info("Updating review with ID: {}", id);
         try {
             ReviewEntity existingReview = reviewRepository.findById(id)
@@ -121,43 +104,37 @@ public class ReviewServiceImpl implements ReviewServiceInterface {
             updateReviewDetails(existingReview, reviewDTO);
             ReviewEntity updatedReview = reviewRepository.save(existingReview);
             logger.info("Review updated successfully with ID: {}", id);
-            return reviewMapper.reviewEntityToReviewDTO(updatedReview);
-        } catch (EntityNotFoundException e) {
-            logger.error("Error: {}", e.getMessage());
+            return reviewMapper.reviewEntityToDTO(updatedReview);
+
+        } catch (CustomExceptions.NotFoundException e) {
+            logger.error("Review not found: {}", e.getMessage());
             throw e;
         } catch (Exception e) {
-            logger.error("Error occurred while updating review with ID {}: {}", id, e.getMessage(), e);
-            throw new RuntimeException("Error occurred while updating review", e);
+            logger.error("Error while updating review: {}", e.getMessage());
+            throw new CustomExceptions.InternalServerErrorException("Review could not be updated: " + e.getMessage());
         }
     }
 
-    private void updateReviewDetails(ReviewEntity reviewEntity, ReviewDTO reviewDTO) {
+    @Override
+    @Transactional
+    public void removeReview(Long id) {
+        logger.info("Attempting to remove review with ID: {}", id);
+        if (!reviewRepository.existsById(id)) {
+            logger.error("Review with ID: {} not found for deletion", id);
+            throw new CustomExceptions.NotFoundException("Review not found with ID: " + id);
+        }
 
+        reviewRepository.deleteById(id);
+        logger.info("Successfully deleted review with ID: {}", id);
+    }
+
+
+    private void updateReviewDetails(ReviewEntity reviewEntity, ReviewDTO reviewDTO) {
         if (reviewDTO.getReviewText() != null) {
             reviewEntity.setReviewText(reviewDTO.getReviewText());
         }
         if (reviewDTO.getRating() != null) {
             reviewEntity.setRating(reviewDTO.getRating());
-        }
-    }
-
-    @Transactional
-    @Override
-    public void deleteReview(Long id) {
-
-        logger.info("Deleting review with ID: {}", id);
-        try {
-            ReviewEntity review = reviewRepository.findById(id)
-                    .orElseThrow(() -> new EntityNotFoundException("Review not found with ID: " + id));
-
-            reviewRepository.delete(review);
-            logger.info("Review deleted successfully with ID: {}", id);
-        } catch (EntityNotFoundException e) {
-            logger.error("Error: {}", e.getMessage());
-            throw e;
-        } catch (Exception e) {
-            logger.error("Error occurred while deleting review with ID {}: {}", id, e.getMessage(), e);
-            throw new RuntimeException("Error occurred while deleting review", e);
         }
     }
 }
