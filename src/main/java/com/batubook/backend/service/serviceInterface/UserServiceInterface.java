@@ -5,8 +5,6 @@ import com.batubook.backend.entity.enums.Role;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 
-import java.util.List;
-
 public interface UserServiceInterface {
 
     UserDTO registerUser(UserDTO userDTO);
@@ -14,7 +12,7 @@ public interface UserServiceInterface {
     Page<UserDTO> getAllUsers(Pageable pageable);
     Page<UserDTO> getUsersByRole(Role role, Pageable pageable);
     Page<UserDTO> getUsersByUsernameAndEmail(String username, String email, Pageable pageable);
-    List<UserDTO> searchUser(String searchTerm);
+    Page<UserDTO> getUserByCriteria(String searchTerm, Pageable pageable);
     UserDTO modifyUser(Long id, UserDTO userDTO);
-    void removeUserById(Long id);
+    void removeUser(Long id);
 }
