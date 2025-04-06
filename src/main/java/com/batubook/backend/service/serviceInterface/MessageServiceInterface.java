@@ -7,10 +7,10 @@ import org.springframework.data.domain.Pageable;
 
 public interface MessageServiceInterface {
 
-    MessageDTO createMessage(MessageDTO messageDTO);
+    MessageDTO registerMessage(MessageDTO messageDTO);
     MessageDTO getMessageById(Long id);
     Page<MessageDTO> getAllMessages(Pageable pageable);
     Page<MessageDTO> getMessageByMessageType(MessageType messageType, Pageable pageable);
-    MessageDTO updateMessage(Long id, MessageDTO messageDTO);
-    void deleteMessage(Long id);
+    MessageDTO modifyMessage(Long id, MessageDTO messageDTO);
+    void removeMessage(Long id);
 }
