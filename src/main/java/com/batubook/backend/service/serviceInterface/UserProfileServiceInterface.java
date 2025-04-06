@@ -11,8 +11,8 @@ public interface UserProfileServiceInterface {
 
     UserProfileDTO getUserProfileById(Long id);
     Page<UserProfileDTO> getAllUserProfiles(Pageable pageable);
-    Page<UserProfileDTO> getUserProfilesByDateOfBirth(LocalDate dateOfBirth, Pageable pageable);
+    Page<UserProfileDTO> getUserProfilesByBirthDate(LocalDate dateOfBirth, Pageable pageable);
     Page<UserProfileDTO> getUserProfilesByGender(Gender gender, Pageable pageable);
     UserProfileDTO modifyUserProfile(Long id, UserProfileDTO userProfileDTO);
-    void removeUserProfileById(Long userId);
+    void removeUserProfile(Long id);
 }
