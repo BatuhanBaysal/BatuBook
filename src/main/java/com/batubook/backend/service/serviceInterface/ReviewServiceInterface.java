@@ -8,10 +8,10 @@ import java.math.BigDecimal;
 
 public interface ReviewServiceInterface {
 
-    ReviewDTO createReview(ReviewDTO reviewDTO);
+    ReviewDTO registerReview(ReviewDTO reviewDTO);
     ReviewDTO getReviewById(Long id);
     Page<ReviewDTO> getAllReviews(Pageable pageable);
     Page<ReviewDTO> getReviewByRating(BigDecimal rating, Pageable pageable);
-    ReviewDTO updateReview(Long id, ReviewDTO reviewDTO);
-    void deleteReview(Long id);
+    ReviewDTO modifyReview(Long id, ReviewDTO reviewDTO);
+    void removeReview(Long id);
 }
