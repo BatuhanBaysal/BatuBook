@@ -6,9 +6,9 @@ import org.springframework.data.domain.Pageable;
 
 public interface QuoteServiceInterface {
 
-    QuoteDTO createQuote(QuoteDTO quoteDTO);
+    QuoteDTO registerQuote(QuoteDTO quoteDTO);
     QuoteDTO getQuoteById(Long id);
     Page<QuoteDTO> getAllQuotes(Pageable pageable);
-    QuoteDTO updateQuote(Long id, QuoteDTO quoteDTO);
-    void deleteQuote(Long id);
+    QuoteDTO modifyQuote(Long id, QuoteDTO quoteDTO);
+    void removeQuote(Long id);
 }
