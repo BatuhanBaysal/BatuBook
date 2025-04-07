@@ -10,7 +10,6 @@ import com.batubook.backend.service.serviceInterface.UserProfileServiceInterface
 import lombok.RequiredArgsConstructor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.dao.EmptyResultDataAccessException;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
@@ -29,74 +28,50 @@ public class UserProfileServiceImpl implements UserProfileServiceInterface {
     @Override
     @Transactional(readOnly = true)
     public UserProfileDTO getUserProfileById(Long id) {
-        logger.info("Fetching user profile with ID: {}", id);
+        logger.info("Attempting to retrieve user profile with ID: {}", id);
+        UserProfileEntity userProfileById = userProfileRepository.findById(id)
+                .orElseThrow(() -> {
+                    logger.warn("User profile not found with ID: {}", id);
+                    return new CustomExceptions.NotFoundException("User profile not found with ID: " + id);
+                });
 
-        try {
-            UserProfileEntity userProfileEntity = userProfileRepository.findById(id)
-                    .orElseThrow(() -> new CustomExceptions.NotFoundException("User profile not found with ID: " + id));
-
-            logger.info("User profile retrieved successfully with ID: {}", id);
-            return userProfileMapper.userProfileEntityToUserProfileDTO(userProfileEntity);
-
-        } catch (Exception e) {
-            logger.error("Error occurred while retrieving user profile with ID: {}", id, e);
-            throw new CustomExceptions.InternalServerErrorException("An unexpected error occurred while fetching the user profile.");
-        }
+        logger.info("Successfully retrieved user profile with ID: {}", id);
+        return userProfileMapper.userProfileEntityToDTO(userProfileById);
     }
 
     @Override
     @Transactional(readOnly = true)
     public Page<UserProfileDTO> getAllUserProfiles(Pageable pageable) {
-        logger.info("Fetching all user profiles");
-
-        try {
-            Page<UserProfileEntity> profiles = userProfileRepository.findAll(pageable);
-            logger.info("Successfully fetched {} user profiles.", profiles.getSize());
-            return profiles.map(userProfileMapper::userProfileEntityToUserProfileDTO);
-
-        } catch (Exception e) {
-            logger.error("Error fetching all user profiles", e);
-            throw new CustomExceptions.InternalServerErrorException("An unexpected error occurred while fetching all user profiles.");
-        }
+        logger.debug("Fetching all user profiles with pagination: page = {}, size = {}", pageable.getPageNumber(), pageable.getPageSize());
+        Page<UserProfileEntity> allUserProfiles = userProfileRepository.findAll(pageable);
+        logger.info("Successfully fetched {} user profiles", allUserProfiles.getNumberOfElements());
+        return allUserProfiles.map(userProfileMapper::userProfileEntityToDTO);
     }
 
     @Override
     @Transactional(readOnly = true)
-    public Page<UserProfileDTO> getUserProfilesByDateOfBirth(LocalDate dateOfBirth, Pageable pageable) {
-        logger.info("Fetching user profiles with date of birth: {}", dateOfBirth);
-
-        try {
-            Page<UserProfileEntity> profiles = userProfileRepository.findByDateOfBirth(dateOfBirth, pageable);
-            logger.info("Successfully fetched {} user profiles with date of birth {}", profiles.getSize(), dateOfBirth);
-            return profiles.map(userProfileMapper::userProfileEntityToUserProfileDTO);
-
-        } catch (Exception e) {
-            logger.error("Error fetching user profiles by date of birth {}: {}", dateOfBirth, e.getMessage(), e);
-            throw new CustomExceptions.InternalServerErrorException("An unexpected error occurred while fetching user profiles.");
-        }
+    public Page<UserProfileDTO> getUserProfilesByBirthDate(LocalDate dateOfBirth, Pageable pageable) {
+        logger.info("Received request to fetch user profiles with date of birth: {} and pagination: page {}, size {}",
+                dateOfBirth, pageable.getPageNumber(), pageable.getPageSize());
+        Page<UserProfileEntity> profiles = userProfileRepository.findByDateOfBirth(dateOfBirth, pageable);
+        logger.info("Successfully fetched {} user profiles with date of birth: {} on page {}.",
+                profiles.getTotalElements(), dateOfBirth, pageable.getPageNumber());
+        return profiles.map(userProfileMapper::userProfileEntityToDTO);
     }
 
     @Override
     @Transactional(readOnly = true)
     public Page<UserProfileDTO> getUserProfilesByGender(Gender gender, Pageable pageable) {
-        logger.info("Fetching user profiles with gender: {} and pagination: {}", gender, pageable);
-
-        try {
-            Page<UserProfileEntity> profiles = userProfileRepository.findByGender(gender, pageable);
-            logger.info("Successfully fetched {} user profiles with gender {}.", profiles.getSize(), gender);
-            return profiles.map(userProfileMapper::userProfileEntityToUserProfileDTO);
-
-        } catch (Exception e) {
-            logger.error("Error fetching user profiles by gender {}: {}", gender, e.getMessage(), e);
-            throw new CustomExceptions.InternalServerErrorException("An unexpected error occurred while fetching user profiles.");
-        }
+        logger.info("Fetching user profiles with gender: {} and pagination: page {}, size {}", gender, pageable.getPageNumber(), pageable.getPageSize());
+        Page<UserProfileEntity> profiles = userProfileRepository.findByGender(gender, pageable);
+        logger.info("Successfully fetched {} user profiles with gender: {} on page {}.", profiles.getTotalElements(), gender, pageable.getPageNumber());
+        return profiles.map(userProfileMapper::userProfileEntityToDTO);
     }
 
     @Override
     @Transactional
     public UserProfileDTO modifyUserProfile(Long id, UserProfileDTO userProfileDTO) {
         logger.info("Modifying user profile with ID: {}", id);
-
         try {
             UserProfileEntity existingProfile = userProfileRepository.findById(id)
                     .orElseThrow(() -> {
@@ -107,15 +82,28 @@ public class UserProfileServiceImpl implements UserProfileServiceInterface {
             modifyUserProfileDetails(existingProfile, userProfileDTO);
             UserProfileEntity updatedUserProfile = userProfileRepository.save(existingProfile);
             logger.info("User profile updated successfully for ID: {}", id);
-            return userProfileMapper.userProfileEntityToUserProfileDTO(updatedUserProfile);
+            return userProfileMapper.userProfileEntityToDTO(updatedUserProfile);
 
         } catch (CustomExceptions.NotFoundException e) {
-            logger.error("User profile not found with ID: {}", id, e);
+            logger.error("User Profile not found: {}", e.getMessage());
             throw e;
         } catch (Exception e) {
-            logger.error("Error updating user profile with ID: {}", id, e);
-            throw new CustomExceptions.InternalServerErrorException("An unexpected error occurred while updating the user profile.");
+            logger.error("Error while updating User Profile: {}", e.getMessage());
+            throw new CustomExceptions.InternalServerErrorException("User Profile could not be updated: " + e.getMessage());
         }
+    }
+
+    @Override
+    @Transactional
+    public void removeUserProfile(Long id) {
+        logger.info("Attempting to remove user profile with ID: {}", id);
+        if (!userProfileRepository.existsById(id)) {
+            logger.error("User profile with ID: {} not found for deletion", id);
+            throw new CustomExceptions.NotFoundException("User profile not found with ID: " + id);
+        }
+
+        userProfileRepository.deleteById(id);
+        logger.info("Successfully deleted user profile with ID: {}", id);
     }
 
     private void modifyUserProfileDetails(UserProfileEntity profile, UserProfileDTO userProfileDTO) {
@@ -123,48 +111,25 @@ public class UserProfileServiceImpl implements UserProfileServiceInterface {
             profile.setDateOfBirth(LocalDate.parse(userProfileDTO.getDateOfBirth()));
             logger.info("Updated Date of Birth for user profile ID: {}", profile.getId());
         }
-
         if (userProfileDTO.getGender() != null) {
             profile.setGender(userProfileDTO.getGender());
             logger.info("Updated Gender for user profile ID: {}", profile.getId());
         }
-
         if (userProfileDTO.getBiography() != null) {
             profile.setBiography(userProfileDTO.getBiography());
             logger.info("Updated Biography for user profile ID: {}", profile.getId());
         }
-
         if (userProfileDTO.getLocation() != null) {
             profile.setLocation(userProfileDTO.getLocation());
             logger.info("Updated Location for user profile ID: {}", profile.getId());
         }
-
         if (userProfileDTO.getOccupation() != null) {
             profile.setOccupation(userProfileDTO.getOccupation());
             logger.info("Updated Occupation for user profile ID: {}", profile.getId());
         }
-
         if (userProfileDTO.getEducation() != null) {
             profile.setEducation(userProfileDTO.getEducation());
             logger.info("Updated Education for user profile ID: {}", profile.getId());
-        }
-    }
-
-    @Override
-    @Transactional
-    public void removeUserProfileById(Long userId) {
-        logger.info("Deleting user with ID: {}", userId);
-
-        try {
-            userProfileRepository.deleteById(userId);
-            logger.info("User deleted successfully with ID: {}", userId);
-
-        } catch (EmptyResultDataAccessException e) {
-            logger.error("User not found for delete with ID: {}", userId, e);
-            throw new CustomExceptions.NotFoundException("User not found with ID: " + userId);
-        } catch (Exception e) {
-            logger.error("Error occurred while deleting user with ID: {}", userId, e);
-            throw new CustomExceptions.InternalServerErrorException("An unexpected error occurred while deleting the user.");
         }
     }
 }
