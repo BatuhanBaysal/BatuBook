@@ -3,12 +3,14 @@ package com.batubook.backend.service.serviceImplementation;
 import com.batubook.backend.dto.BookDTO;
 import com.batubook.backend.entity.BookEntity;
 import com.batubook.backend.entity.enums.Genre;
+import com.batubook.backend.exception.CustomExceptions;
 import com.batubook.backend.mapper.BookMapper;
 import com.batubook.backend.repository.BookRepository;
 import com.batubook.backend.service.serviceInterface.BookServiceInterface;
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.EntityNotFoundException;
 import jakarta.persistence.PersistenceContext;
+import jakarta.persistence.TypedQuery;
 import jakarta.persistence.criteria.CriteriaBuilder;
 import jakarta.persistence.criteria.CriteriaQuery;
 import jakarta.persistence.criteria.Predicate;
@@ -17,14 +19,15 @@ import lombok.RequiredArgsConstructor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
 import java.time.format.DateTimeParseException;
 import java.util.List;
-import java.util.Optional;
 import java.util.stream.Collectors;
 
 @Service
@@ -39,77 +42,62 @@ public class BookServiceImpl implements BookServiceInterface {
     private EntityManager entityManager;
 
     @Override
-    public BookDTO createBook(BookDTO bookDTO) {
-
+    public BookDTO registerBook(BookDTO bookDTO) {
         logger.info("Creating a new book with title: {}", bookDTO.getTitle());
         try {
-            BookEntity bookEntity = bookMapper.bookDTOToBookEntity(bookDTO);
+            BookEntity bookEntity = bookMapper.bookDTOToEntity(bookDTO);
             logger.debug("Converted BookDTO to BookEntity: {}", bookEntity);
-
             BookEntity savedBook = bookRepository.save(bookEntity);
             logger.info("Book saved successfully with ID: {}", savedBook.getId());
+            return bookMapper.bookEntityToDTO(savedBook);
 
-            return bookMapper.bookEntityToBookDTO(savedBook);
-        } catch (Exception e) {
-            logger.error("Error occurred while creating the book: {}", e.getMessage(), e);
-            throw new RuntimeException("Error occurred while creating the book", e);
-        }
-    }
-
-    @Override
-    public BookDTO getBookById(Long id) {
-
-        logger.info("Fetching book with ID: {}", id);
-        try {
-            BookEntity bookEntity = bookRepository.findById(id)
-                    .orElseThrow(() -> new EntityNotFoundException("Book with ID " + id + " not found"));
-
-            logger.info("Book with ID: {} found successfully", id);
-            return bookMapper.bookEntityToBookDTO(bookEntity);
-        } catch (EntityNotFoundException e) {
-            logger.error("Book with ID: {} not found", id, e);
+        } catch (CustomExceptions.BadRequestException e) {
+            logger.error("Bad Request Error: {}", e.getMessage());
             throw e;
         } catch (Exception e) {
-            logger.error("Error occurred while fetching book with ID: {}", id, e);
-            throw new RuntimeException("Error occurred while fetching the book", e);
+            logger.error("Error while creating book: {}", e.getMessage());
+            throw new CustomExceptions.InternalServerErrorException("Book could not be created: " + e.getMessage());
         }
     }
 
     @Override
+    @Transactional(readOnly = true)
+    public BookDTO getBookById(Long id) {
+        logger.info("Attempting to retrieve book with ID: {}", id);
+        BookEntity bookEntity = bookRepository.findById(id)
+                .orElseThrow(() -> {
+                    logger.warn("Book not found with ID: {}", id);
+                    return new CustomExceptions.NotFoundException("Book not found with ID: " + id);
+                });
+
+        logger.info("Successfully retrieved book with ID: {}", id);
+        return bookMapper.bookEntityToDTO(bookEntity);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
     public Page<BookDTO> getAllBooks(Pageable pageable) {
-
-        logger.info("Fetching all books with pagination: Page number = {}, Page size = {}", pageable.getPageNumber(), pageable.getPageSize());
-        try {
-            Page<BookEntity> books = bookRepository.findAll(pageable);
-            logger.info("Successfully fetched {} books", books.getTotalElements());
-
-            return books.map(bookMapper::bookEntityToBookDTO);
-        } catch (Exception e) {
-            logger.error("Error occurred while fetching books with pagination", e);
-            throw new RuntimeException("Error occurred while fetching books", e);
-        }
+        logger.debug("Fetching all books with pagination: page = {}, size = {}", pageable.getPageNumber(), pageable.getPageSize());
+        Page<BookEntity> allBooks = bookRepository.findAll(pageable);
+        logger.info("Successfully fetched {} books", allBooks.getNumberOfElements());
+        return allBooks.map(bookMapper::bookEntityToDTO);
     }
 
     @Override
+    @Transactional(readOnly = true)
     public Page<BookDTO> getBookByTitleAndAuthor(String title, String author, Pageable pageable) {
-
-        logger.info("Searching books with title: '{}' and author: '{}' using pagination: Page number = {}, Page size = {}",
+        logger.debug("Searching for books with title '{}' and author '{}' using pagination: Page number = {}, Page size = {}",
                 title, author, pageable.getPageNumber(), pageable.getPageSize());
-        try {
-            Page<BookEntity> books = bookRepository.findByTitleAndAuthorIgnoreCase(title, author, pageable);
-            logger.info("Successfully fetched {} books with the given criteria", books.getTotalElements());
-
-            return books.map(bookMapper::bookEntityToBookDTO);
-        } catch (Exception e) {
-            logger.error("Error occurred while searching books with title: '{}' and author: '{}'", title, author, e);
-            throw new RuntimeException("Error occurred while searching books by title and author", e);
-        }
+        Page<BookEntity> books = bookRepository.findByTitleAndAuthorIgnoreCase(title, author, pageable);
+        logger.info("Successfully fetched {} books with the given title '{}' and author '{}'", books.getTotalElements(), title, author);
+        return books.map(bookMapper::bookEntityToDTO);
     }
 
     @Override
-    public List<BookDTO> searchBook(String searchTerm) {
-
-        logger.info("Searching books with search term: '{}'", searchTerm);
+    @Transactional(readOnly = true)
+    public Page<BookDTO> getBookByCriteria(String searchTerm, Pageable pageable) {
+        logger.info("Searching books with search term: '{}' using pagination: page number = {}, page size = {}",
+                searchTerm, pageable.getPageNumber(), pageable.getPageSize());
         try {
             CriteriaBuilder cb = entityManager.getCriteriaBuilder();
             CriteriaQuery<BookEntity> query = cb.createQuery(BookEntity.class);
@@ -117,84 +105,67 @@ public class BookServiceImpl implements BookServiceInterface {
 
             Predicate titlePredicate = cb.like(cb.lower(book.get("title")), "%" + searchTerm.toLowerCase() + "%");
             Predicate authorPredicate = cb.like(cb.lower(book.get("author")), "%" + searchTerm.toLowerCase() + "%");
-
             query.where(cb.or(titlePredicate, authorPredicate));
-            List<BookEntity> books = entityManager.createQuery(query).getResultList();
-            logger.info("Successfully found {} books for search term '{}'", books.size(), searchTerm);
-            return books.stream().map(bookMapper::bookEntityToBookDTO).collect(Collectors.toList());
+
+            TypedQuery<BookEntity> typedQuery = entityManager.createQuery(query);
+            typedQuery.setFirstResult((int) pageable.getOffset());
+            typedQuery.setMaxResults(pageable.getPageSize());
+
+            List<BookEntity> books = typedQuery.getResultList();
+            logger.info("Found {} books for search term '{}'", books.size(), searchTerm);
+            return new PageImpl<>(books.stream()
+                    .map(bookMapper::bookEntityToDTO)
+                    .collect(Collectors.toList()), pageable, books.size());
+
         } catch (Exception e) {
-            logger.error("Error occurred while searching for books with search term: '{}'", searchTerm, e);
+            logger.error("Error occurred while searching for books with search term '{}'", searchTerm, e);
             throw new RuntimeException("Error occurred while searching for books", e);
         }
     }
 
     @Override
-    public Optional<BookDTO> getBookByIsbn(String isbn) {
-
+    @Transactional(readOnly = true)
+    public BookDTO getBookByIsbn(String isbn) {
         logger.info("Searching for book with ISBN: '{}'", isbn);
-        try {
-            Optional<BookEntity> bookEntity = bookRepository.findByIsbn(isbn);
-            if (bookEntity.isPresent()) {
-                logger.info("Found book with ISBN: '{}'", isbn);
-            } else {
-                logger.info("No book found with ISBN: '{}'", isbn);
-            }
+        BookEntity bookEntity = bookRepository.findByIsbn(isbn)
+                .orElseThrow(() -> new CustomExceptions.NotFoundException("Book not found with ISBN: " + isbn));
 
-            return bookEntity.map(bookMapper::bookEntityToBookDTO);
-        } catch (Exception e) {
-            logger.error("Error occurred while searching for book with ISBN: '{}'", isbn, e);
-            throw new RuntimeException("Error occurred while searching for book", e);
-        }
+        logger.info("Found book with ISBN: '{}'", isbn);
+        return bookMapper.bookEntityToDTO(bookEntity);
     }
 
     @Override
+    @Transactional(readOnly = true)
     public Page<BookDTO> getBookByPageCountBetween(int minPageCount, int maxPageCount, Pageable pageable) {
-
-        logger.info("Searching for books with page count between {} and {} using pagination: Page number = {}, Page size = {}",
+        logger.info("Searching for books with page count between {} and {} using pagination: page number = {}, page size = {}",
                 minPageCount, maxPageCount, pageable.getPageNumber(), pageable.getPageSize());
-        try {
-            Page<BookEntity> books = bookRepository.findByPageCountBetween(minPageCount, maxPageCount, pageable);
-            logger.info("Successfully found {} books with page count between {} and {}", books.getTotalElements(), minPageCount, maxPageCount);
-            return books.map(bookMapper::bookEntityToBookDTO);
-        } catch (Exception e) {
-            logger.error("Error occurred while searching for books with page count between {} and {}", minPageCount, maxPageCount, e);
-            throw new RuntimeException("Error occurred while searching for books", e);
-        }
+        Page<BookEntity> books = bookRepository.findByPageCountBetween(minPageCount, maxPageCount, pageable);
+        logger.info("Found {} books with page count between {} and {}", books.getTotalElements(), minPageCount, maxPageCount);
+        return books.map(bookMapper::bookEntityToDTO);
     }
 
     @Override
+    @Transactional(readOnly = true)
     public Page<BookDTO> getBookByPublishDateBetween(LocalDate startDate, LocalDate endDate, Pageable pageable) {
-
-        logger.info("Searching for books published between '{}' and '{}' using pagination: Page number = {}, Page size = {}",
+        logger.info("Searching for books published between '{}' and '{}' with pagination: page number = {}, page size = {}",
                 startDate, endDate, pageable.getPageNumber(), pageable.getPageSize());
-        try {
-            Page<BookEntity> books = bookRepository.findByPublishDateBetween(startDate, endDate, pageable);
-            logger.info("Successfully found {} books published between '{}' and '{}'", books.getTotalElements(), startDate, endDate);
-            return books.map(bookMapper::bookEntityToBookDTO);
-        } catch (Exception e) {
-            logger.error("Error occurred while searching for books published between '{}' and '{}'", startDate, endDate, e);
-            throw new RuntimeException("Error occurred while searching for books", e);
-        }
+        Page<BookEntity> books = bookRepository.findByPublishDateBetween(startDate, endDate, pageable);
+        logger.info("Found {} books published between '{}' and '{}'", books.getTotalElements(), startDate, endDate);
+        return books.map(bookMapper::bookEntityToDTO);
     }
 
     @Override
+    @Transactional(readOnly = true)
     public Page<BookDTO> getBookByGenre(Genre genre, Pageable pageable) {
-
-        logger.info("Searching for books of genre '{}' using pagination: Page number = {}, Page size = {}",
+        logger.info("Searching for books of genre '{}' with pagination: page number = {}, page size = {}",
                 genre, pageable.getPageNumber(), pageable.getPageSize());
-        try {
-            Page<BookEntity> books = bookRepository.findByGenre(genre, pageable);
-            logger.info("Successfully found {} books of genre '{}'", books.getTotalElements(), genre);
-            return books.map(bookMapper::bookEntityToBookDTO);
-        } catch (Exception e) {
-            logger.error("Error occurred while searching for books of genre '{}'", genre, e);
-            throw new RuntimeException("Error occurred while searching for books by genre", e);
-        }
+        Page<BookEntity> books = bookRepository.findByGenre(genre, pageable);
+        logger.info("Found {} books of genre '{}'", books.getTotalElements(), genre);
+        return books.map(bookMapper::bookEntityToDTO);
     }
 
     @Override
-    public BookDTO updateBook(Long id, BookDTO bookDTO) {
-
+    public BookDTO modifyBook(Long id, BookDTO bookDTO) {
         logger.info("Attempting to update book with id: {}", id);
         try {
             BookEntity existingBook = bookRepository.findById(id)
@@ -206,15 +177,34 @@ public class BookServiceImpl implements BookServiceInterface {
             updateBookDetails(existingBook, bookDTO);
             BookEntity updatedBook = bookRepository.save(existingBook);
             logger.info("Successfully updated book with id: {}", id);
-            return bookMapper.bookEntityToBookDTO(updatedBook);
+            return bookMapper.bookEntityToDTO(updatedBook);
+
+        } catch (CustomExceptions.NotFoundException e) {
+            logger.error("Book not found: {}", e.getMessage());
+            throw e;
         } catch (Exception e) {
-            logger.error("Error occurred while updating book with id: {}", id, e);
-            throw new RuntimeException("Error occurred while updating the book", e);
+            logger.error("Error while updating book: {}", e.getMessage());
+            throw new CustomExceptions.InternalServerErrorException("Book could not be updated: " + e.getMessage());
         }
     }
 
-    private void updateBookDetails(BookEntity bookEntity, BookDTO bookDTO) {
+    @Override
+    @Transactional
+    public void removeBook(Long id) {
+        logger.info("Attempting to remove book with ID: {}", id);
+        if (!bookRepository.existsById(id)) {
+            logger.error("Book with ID: {} not found for deletion", id);
+            throw new CustomExceptions.NotFoundException("Book not found with ID: " + id);
+        }
 
+        bookRepository.deleteById(id);
+        logger.info("Successfully deleted book with ID: {}", id);
+    }
+
+    private void updateBookDetails(BookEntity bookEntity, BookDTO bookDTO) {
+        if (bookDTO.getBookCoverImageUrl() != null) {
+            bookEntity.setBookCoverImageUrl(bookDTO.getBookCoverImageUrl());
+        }
         if (bookDTO.getTitle() != null) {
             bookEntity.setTitle(bookDTO.getTitle());
         }
@@ -237,23 +227,8 @@ public class BookServiceImpl implements BookServiceInterface {
         if (bookDTO.getGenre() != null) {
             bookEntity.setGenre(bookDTO.getGenre());
         }
-    }
-
-    @Override
-    public void deleteBook(Long id) {
-
-        logger.info("Attempting to delete book with id: {}", id);
-        try {
-            if (!bookRepository.existsById(id)) {
-                logger.warn("Book with id: {} not found, cannot delete", id);
-                throw new EntityNotFoundException("Book not found with ID: " + id);
-            }
-
-            bookRepository.deleteById(id);
-            logger.info("Successfully deleted book with id: {}", id);
-        } catch (Exception e) {
-            logger.error("Error occurred while deleting book with id: {}", id, e);
-            throw new RuntimeException("Error occurred while deleting the book", e);
+        if (bookDTO.getSummary() != null) {
+            bookEntity.setSummary(bookDTO.getSummary());
         }
     }
 }
