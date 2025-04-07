@@ -2,6 +2,7 @@ package com.batubook.backend.controller;
 
 import com.batubook.backend.dto.FollowDTO;
 import com.batubook.backend.service.serviceImplementation.FollowServiceImpl;
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -21,74 +22,76 @@ public class FollowController {
     private final Logger logger = LoggerFactory.getLogger(FollowController.class);
 
     @PostMapping("/follow-user")
-    public ResponseEntity<FollowDTO> followUser(@RequestBody FollowDTO followDTO) {
+    public ResponseEntity<FollowDTO> followUser(@Valid @RequestBody FollowDTO followDTO) {
         logger.info("Request to follow user with ID: {}", followDTO.getFollowedUserId());
-        FollowDTO result = followService.followUser(followDTO);
+        FollowDTO followedUser = followService.followUser(followDTO);
         logger.info("User with ID: {} followed successfully.", followDTO.getFollowedUserId());
-        return new ResponseEntity<>(result, HttpStatus.CREATED);
+        return ResponseEntity.status(HttpStatus.CREATED).body(followedUser);
     }
 
     @PostMapping("/follow-book")
     public ResponseEntity<FollowDTO> followBook(@RequestBody FollowDTO followDTO) {
         logger.info("Request to follow book with ID: {}", followDTO.getFollowedBookId());
-        FollowDTO result = followService.followBook(followDTO);
+        FollowDTO followedBook = followService.followBook(followDTO);
         logger.info("Book with ID: {} followed successfully.", followDTO.getFollowedBookId());
-        return new ResponseEntity<>(result, HttpStatus.CREATED);
+        return ResponseEntity.status(HttpStatus.CREATED).body(followedBook);
     }
 
-    @DeleteMapping("/unfollow-user")
-    public ResponseEntity<Void> unfollowUser(@RequestBody FollowDTO followDTO) {
-        logger.info("Request to unfollow user with ID: {}", followDTO.getFollowedUserId());
-        boolean unfollowed = followService.unfollowUser(followDTO);
-        if (unfollowed) {
-            logger.info("User with ID: {} unfollowed successfully.", followDTO.getFollowedUserId());
-            return new ResponseEntity<>(HttpStatus.NO_CONTENT);
-        } else {
-            logger.warn("User with ID: {} was not found for unfollow.", followDTO.getFollowedUserId());
-            return new ResponseEntity<>(HttpStatus.NOT_FOUND);
-        }
-    }
-
-    @DeleteMapping("/unfollow-book")
-    public ResponseEntity<Void> unfollowBook(@RequestBody FollowDTO followDTO) {
-        logger.info("Request to unfollow book with ID: {}", followDTO.getFollowedBookId());
-        boolean unfollowed = followService.unfollowBook(followDTO);
-        if (unfollowed) {
-            logger.info("Book with ID: {} unfollowed successfully.", followDTO.getFollowedBookId());
-            return new ResponseEntity<>(HttpStatus.NO_CONTENT);
-        } else {
-            logger.warn("Book with ID: {} was not found for unfollow.", followDTO.getFollowedBookId());
-            return new ResponseEntity<>(HttpStatus.NOT_FOUND);
-        }
+    @GetMapping
+    public ResponseEntity<Page<FollowDTO>> fetchAllFollows(@PageableDefault(size = 5) Pageable pageable) {
+        logger.info("Fetching all follows with Page: {}, Size: {}", pageable.getPageNumber(), pageable.getPageSize());
+        Page<FollowDTO> allFollows = followService.getAllFollows(pageable);
+        logger.info("Fetched {} follow records.", allFollows.getTotalElements());
+        return ResponseEntity.ok(allFollows);
     }
 
     @GetMapping("/followed-users/{followerId}")
     public ResponseEntity<Page<FollowDTO>> getFollowedUsers(
             @PathVariable Long followerId,
-            @PageableDefault(size = 10) Pageable pageable) {
+            @PageableDefault(size = 5) Pageable pageable) {
         logger.info("Request to get followed users for follower with ID: {}", followerId);
         Page<FollowDTO> followedUsers = followService.getFollowedUsers(followerId, pageable);
         logger.info("Returning {} followed users for follower with ID: {}", followedUsers.getTotalElements(), followerId);
-        return new ResponseEntity<>(followedUsers, HttpStatus.OK);
+        return ResponseEntity.ok(followedUsers);
     }
 
     @GetMapping("/followers/{followedUserId}")
     public ResponseEntity<Page<FollowDTO>> getFollowers(
             @PathVariable Long followedUserId,
-            @PageableDefault(size = 10) Pageable pageable) {
+            @PageableDefault(size = 5) Pageable pageable) {
         logger.info("Request to get followers for followed user with ID: {}", followedUserId);
         Page<FollowDTO> followers = followService.getFollowers(followedUserId, pageable);
         logger.info("Returning {} followers for user with ID: {}", followers.getTotalElements(), followedUserId);
-        return new ResponseEntity<>(followers, HttpStatus.OK);
+        return ResponseEntity.ok(followers);
     }
 
     @GetMapping("/book-followers/{followedBookId}")
     public ResponseEntity<Page<FollowDTO>> getBookFollowers(
             @PathVariable Long followedBookId,
-            @PageableDefault(size = 10) Pageable pageable) {
+            @PageableDefault(size = 5) Pageable pageable) {
         logger.info("Request to get followers for book with ID: {}", followedBookId);
         Page<FollowDTO> bookFollowers = followService.getBookFollowers(followedBookId, pageable);
         logger.info("Returning {} followers for book with ID: {}", bookFollowers.getTotalElements(), followedBookId);
-        return new ResponseEntity<>(bookFollowers, HttpStatus.OK);
+        return ResponseEntity.ok(bookFollowers);
+    }
+
+    @DeleteMapping("/unfollow-user")
+    public ResponseEntity<Void> unfollowUser(@RequestBody FollowDTO followDTO) {
+        logger.info("Request received to unfollow user with ID: {} by follower with ID: {}",
+                followDTO.getFollowedUserId(), followDTO.getFollowerId());
+        followService.unfollowUser(followDTO);
+        logger.info("User with ID: {} successfully unfollowed user with ID: {}",
+                followDTO.getFollowerId(), followDTO.getFollowedUserId());
+        return ResponseEntity.noContent().build();
+    }
+
+    @DeleteMapping("/unfollow-book")
+    public ResponseEntity<Void> unfollowBook(@RequestBody FollowDTO followDTO) {
+        logger.info("Request received to unfollow book with ID: {} by user with ID: {}",
+                followDTO.getFollowedBookId(), followDTO.getFollowerId());
+        followService.unfollowBook(followDTO);
+        logger.info("User with ID: {} successfully unfollowed book with ID: {}",
+                followDTO.getFollowerId(), followDTO.getFollowedBookId());
+        return ResponseEntity.noContent().build();
     }
 }
