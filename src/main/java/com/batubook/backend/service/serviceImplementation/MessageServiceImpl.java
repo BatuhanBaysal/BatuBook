@@ -14,7 +14,8 @@ import com.batubook.backend.repository.ReviewRepository;
 import com.batubook.backend.repository.UserRepository;
 import com.batubook.backend.service.serviceInterface.MessageServiceInterface;
 import lombok.RequiredArgsConstructor;
-import lombok.extern.slf4j.Slf4j;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
@@ -22,147 +23,153 @@ import org.springframework.transaction.annotation.Transactional;
 
 @Service
 @RequiredArgsConstructor
-@Slf4j
 public class MessageServiceImpl implements MessageServiceInterface {
 
     private final MessageRepository messageRepository;
+    private final MessageMapper messageMapper;
+    private static final Logger logger = LoggerFactory.getLogger(MessageServiceImpl.class);
+
     private final UserRepository userRepository;
     private final ReviewRepository reviewRepository;
     private final QuoteRepository quoteRepository;
-    private final MessageMapper messageMapper;
 
-    @Transactional
     @Override
-    public MessageDTO createMessage(MessageDTO messageDTO) {
+    @Transactional
+    public MessageDTO registerMessage(MessageDTO messageDTO) {
         try {
-            log.info("Creating message for senderId: {}", messageDTO.getSenderId());
-            UserEntity sender = userRepository.findById(messageDTO.getSenderId())
-                    .orElseThrow(() -> new CustomExceptions.NotFoundException("Sender not found with ID: " + messageDTO.getSenderId()));
+            logger.info("Creating message for senderId: {}", messageDTO.getSenderId());
+            UserEntity sender = validateAndGetSender(messageDTO.getSenderId());
+            UserEntity receiver = validateAndGetReceiver(messageDTO.getReceiverId(), messageDTO.getMessageType());
 
-            UserEntity receiver = null;
-            if (messageDTO.getReceiverId() != null) {
-                receiver = userRepository.findById(messageDTO.getReceiverId())
-                        .orElseThrow(() -> new CustomExceptions.NotFoundException("Receiver not found with ID: " + messageDTO.getReceiverId()));
-            }
-
-            MessageEntity messageEntity = new MessageEntity();
+            MessageEntity messageEntity = messageMapper.messageDTOToEntity(messageDTO);
             messageEntity.setSender(sender);
             messageEntity.setReceiver(receiver);
-            messageEntity.setMessageContent(messageDTO.getMessageContent());
 
-            if (messageDTO.getMessageType() == MessageType.REVIEW && messageDTO.getReviewId() != null) {
-                ReviewEntity review = reviewRepository.findById(messageDTO.getReviewId())
-                        .orElseThrow(() -> new CustomExceptions.NotFoundException("Review not found with ID: " + messageDTO.getReviewId()));
-                messageEntity.setReview(review);
-            } else if (messageDTO.getMessageType() == MessageType.QUOTE && messageDTO.getQuoteId() != null) {
-                QuoteEntity quote = quoteRepository.findById(messageDTO.getQuoteId())
-                        .orElseThrow(() -> new CustomExceptions.NotFoundException("Quote not found with ID: " + messageDTO.getQuoteId()));
-                messageEntity.setQuote(quote);
-            } else if (messageDTO.getMessageType() == MessageType.PERSONAL) {
-                messageEntity.setReview(null);
-                messageEntity.setQuote(null);
-            }
-
+            validateReviewOrQuote(messageDTO, messageEntity);
             messageEntity.setMessageType(messageDTO.getMessageType());
             messageRepository.save(messageEntity);
-            log.info("Message created successfully with ID: {}", messageEntity.getId());
+            logger.info("Message created successfully with ID: {}", messageEntity.getId());
             messageDTO.setId(messageEntity.getId());
             return messageDTO;
 
+        } catch (CustomExceptions.BadRequestException e) {
+            logger.error("Bad Request Error: {}", e.getMessage());
+            throw e;
         } catch (Exception e) {
-            log.error("Error while creating message: {}", e.getMessage());
-            throw new CustomExceptions.BadRequestException("Message could not be created: " + e.getMessage());
+            logger.error("Error while creating message: {}", e.getMessage());
+            throw new CustomExceptions.InternalServerErrorException("Message could not be created: " + e.getMessage());
         }
     }
 
-    @Transactional(readOnly = true)
     @Override
+    @Transactional(readOnly = true)
     public MessageDTO getMessageById(Long id) {
-        log.info("Fetching message with ID: {}", id);
-        return messageRepository.findById(id)
-                .map(messageMapper::messageEntityToMessageDTO)
+        logger.info("Attempting to retrieve message with ID: {}", id);
+        MessageEntity messageEntity = messageRepository.findById(id)
                 .orElseThrow(() -> {
-                    log.error("Message not found with ID: {}", id);
+                    logger.warn("Message not found with ID: {}", id);
                     return new CustomExceptions.NotFoundException("Message not found with ID: " + id);
                 });
+
+        logger.info("Successfully retrieved message with ID: {}", id);
+        return messageMapper.messageEntityToDTO(messageEntity);
     }
 
-    @Transactional(readOnly = true)
     @Override
+    @Transactional(readOnly = true)
     public Page<MessageDTO> getAllMessages(Pageable pageable) {
-        log.info("Fetching all messages");
-        return messageRepository.findAll(pageable).map(messageMapper::messageEntityToMessageDTO);
+        logger.debug("Fetching all messages with pagination: page = {}, size = {}", pageable.getPageNumber(), pageable.getPageSize());
+        Page<MessageEntity> allMessages = messageRepository.findAll(pageable);
+        logger.info("Successfully fetched {} messages", allMessages.getNumberOfElements());
+        return allMessages.map(messageMapper::messageEntityToDTO);
     }
 
+    @Override
     @Transactional(readOnly = true)
-    @Override
     public Page<MessageDTO> getMessageByMessageType(MessageType messageType, Pageable pageable) {
-        log.info("Fetching messages with type: {}", messageType);
-        return messageRepository.findByMessageType(messageType, pageable)
-                .map(messageMapper::messageEntityToMessageDTO);
+        logger.info("Started fetching messages with type: {} and pagination (Page: {}, Size: {})",
+                messageType, pageable.getPageNumber(), pageable.getPageSize());
+        Page<MessageEntity> messages = messageRepository.findByMessageType(messageType, pageable);
+        logger.info("Fetched {} messages with type: {}. Total pages: {}, Total elements: {}",
+                messages.getTotalElements(), messageType, messages.getTotalPages(), messages.getTotalElements());
+        return messages.map(messageMapper::messageEntityToDTO);
     }
 
-    @Transactional
     @Override
-    public MessageDTO updateMessage(Long id, MessageDTO messageDTO) {
+    @Transactional
+    public MessageDTO modifyMessage(Long id, MessageDTO messageDTO) {
         try {
-            log.info("Updating message with ID: {}", id);
+            logger.info("Updating message with ID: {}", id);
             MessageEntity existingMessage = messageRepository.findById(id)
                     .orElseThrow(() -> new CustomExceptions.NotFoundException("Message not found with ID: " + id));
 
-            UserEntity sender = userRepository.findById(messageDTO.getSenderId())
-                    .orElseThrow(() -> new CustomExceptions.NotFoundException("Sender not found with ID: " + messageDTO.getSenderId()));
+            UserEntity sender = validateAndGetSender(messageDTO.getSenderId());
+            UserEntity receiver = validateAndGetReceiver(messageDTO.getReceiverId(), messageDTO.getMessageType());
 
-            UserEntity receiver = null;
-            if (messageDTO.getReceiverId() != null) {
-                receiver = userRepository.findById(messageDTO.getReceiverId())
-                        .orElseThrow(() -> new CustomExceptions.NotFoundException("Receiver not found with ID: " + messageDTO.getReceiverId()));
-            }
-
-            existingMessage.setSender(sender);
-            existingMessage.setReceiver(receiver);
-            existingMessage.setMessageContent(messageDTO.getMessageContent());
-
-            if (messageDTO.getMessageType() == MessageType.REVIEW && messageDTO.getReviewId() != null) {
-                ReviewEntity review = reviewRepository.findById(messageDTO.getReviewId())
-                        .orElseThrow(() -> new CustomExceptions.NotFoundException("Review not found with ID: " + messageDTO.getReviewId()));
-                existingMessage.setReview(review);
-                existingMessage.setQuote(null);
-            } else if (messageDTO.getMessageType() == MessageType.QUOTE && messageDTO.getQuoteId() != null) {
-                QuoteEntity quote = quoteRepository.findById(messageDTO.getQuoteId())
-                        .orElseThrow(() -> new CustomExceptions.NotFoundException("Quote not found with ID: " + messageDTO.getQuoteId()));
-                existingMessage.setQuote(quote);
-                existingMessage.setReview(null);
-            } else if (messageDTO.getMessageType() == MessageType.PERSONAL) {
-                existingMessage.setReview(null);
-                existingMessage.setQuote(null);
-            }
-
-            existingMessage.setMessageType(messageDTO.getMessageType());
+            updateMessageFields(existingMessage, messageDTO, sender, receiver);
+            validateReviewOrQuote(messageDTO, existingMessage);
             messageRepository.save(existingMessage);
-            log.info("Message updated successfully with ID: {}", existingMessage.getId());
+            logger.info("Message updated successfully with ID: {}", existingMessage.getId());
             messageDTO.setId(existingMessage.getId());
             return messageDTO;
+
+        } catch (CustomExceptions.NotFoundException e) {
+            logger.error("Message not found: {}", e.getMessage());
+            throw e;
         } catch (Exception e) {
-            log.error("Error while updating message: {}", e.getMessage());
-            throw new CustomExceptions.BadRequestException("Message could not be updated: " + e.getMessage());
+            logger.error("Error while updating message: {}", e.getMessage());
+            throw new CustomExceptions.InternalServerErrorException("Message could not be updated: " + e.getMessage());
         }
     }
 
-    @Transactional
     @Override
-    public void deleteMessage(Long id) {
-        log.info("Deleting message with ID: {}", id);
-        try {
-            if (!messageRepository.existsById(id)) {
-                throw new CustomExceptions.NotFoundException("Message not found with ID: " + id);
-            }
-
-            messageRepository.deleteById(id);
-            log.info("Message deleted successfully with ID: {}", id);
-        } catch (Exception e) {
-            log.error("Error while deleting message with ID {}: {}", id, e.getMessage(), e);
-            throw new CustomExceptions.InternalServerErrorException("Message deletion failed: " + e.getMessage());
+    @Transactional
+    public void removeMessage(Long id) {
+        logger.info("Attempting to remove message with ID: {}", id);
+        if (!messageRepository.existsById(id)) {
+            logger.error("Message with ID: {} not found for deletion", id);
+            throw new CustomExceptions.NotFoundException("Message not found with ID: " + id);
         }
+
+        messageRepository.deleteById(id);
+        logger.info("Successfully deleted message with ID: {}", id);
+    }
+
+    private UserEntity validateAndGetSender(Long senderId) {
+        return userRepository.findById(senderId)
+                .orElseThrow(() -> new CustomExceptions.NotFoundException("Sender not found with ID: " + senderId));
+    }
+
+    private UserEntity validateAndGetReceiver(Long receiverId, MessageType messageType) {
+        if (messageType == MessageType.PERSONAL && receiverId == null) {
+            throw new CustomExceptions.BadRequestException("Receiver is required for PERSONAL message type");
+        }
+        if ((messageType == MessageType.REVIEW || messageType == MessageType.QUOTE) && receiverId != null) {
+            throw new CustomExceptions.BadRequestException("Receiver should be null for REVIEW or QUOTE message type");
+        }
+        if (receiverId != null) {
+            return userRepository.findById(receiverId)
+                    .orElseThrow(() -> new CustomExceptions.NotFoundException("Receiver not found with ID: " + receiverId));
+        }
+        return null;
+    }
+
+    private void validateReviewOrQuote(MessageDTO messageDTO, MessageEntity messageEntity) {
+        if (messageDTO.getMessageType() == MessageType.REVIEW && messageDTO.getReviewId() != null) {
+            ReviewEntity review = reviewRepository.findById(messageDTO.getReviewId())
+                    .orElseThrow(() -> new CustomExceptions.NotFoundException("Review not found with ID: " + messageDTO.getReviewId()));
+            messageEntity.setReview(review);
+        } else if (messageDTO.getMessageType() == MessageType.QUOTE && messageDTO.getQuoteId() != null) {
+            QuoteEntity quote = quoteRepository.findById(messageDTO.getQuoteId())
+                    .orElseThrow(() -> new CustomExceptions.NotFoundException("Quote not found with ID: " + messageDTO.getQuoteId()));
+            messageEntity.setQuote(quote);
+        }
+    }
+
+    private void updateMessageFields(MessageEntity existingMessage, MessageDTO messageDTO, UserEntity sender, UserEntity receiver) {
+        existingMessage.setSender(sender);
+        existingMessage.setReceiver(receiver);
+        existingMessage.setMessageContent(messageDTO.getMessageContent());
+        existingMessage.setMessageType(messageDTO.getMessageType());
     }
 }
