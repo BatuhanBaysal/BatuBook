@@ -8,6 +8,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.web.PageableDefault;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -17,98 +18,60 @@ import java.math.BigDecimal;
 @RestController
 @RequestMapping("api/reviews")
 @RequiredArgsConstructor
-@CrossOrigin("*")
 public class ReviewController {
 
     private final ReviewServiceImpl reviewService;
     private static final Logger logger = LoggerFactory.getLogger(ReviewController.class);
 
-    @PostMapping("/createReview")
+    @PostMapping("/create")
     public ResponseEntity<ReviewDTO> createReview(@Valid @RequestBody ReviewDTO reviewDTO) {
-
         logger.info("Received request to create a new review: {}", reviewDTO);
-        try {
-            ReviewDTO createReview = reviewService.createReview(reviewDTO);
-            logger.info("Successfully created review with ID: {}", createReview.getId());
-            return ResponseEntity.status(HttpStatus.CREATED).body(createReview);
-        } catch (Exception e) {
-            logger.error("Error occurred while creating review: {}", e.getMessage(), e);
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(null);
-        }
+        ReviewDTO createReview = reviewService.registerReview(reviewDTO);
+        logger.info("Successfully created review with ID: {}", createReview.getId());
+        return ResponseEntity.status(HttpStatus.CREATED).body(createReview);
     }
 
-    @GetMapping("/reviewId/{id}")
-    public ResponseEntity<ReviewDTO> searchReviewById(@PathVariable Long id) {
-
-        logger.info("Received request to fetch review with ID: {}", id);
-        try {
-            ReviewDTO reviewById = reviewService.getReviewById(id);
-            logger.info("Successfully fetched review with ID: {}", id);
-            return ResponseEntity.ok(reviewById);
-        } catch (Exception e) {
-            logger.error("Error occurred while fetching review with ID {}: {}", id, e.getMessage(), e);
-            return ResponseEntity.status(HttpStatus.NOT_FOUND).body(null);
-        }
+    @GetMapping("/{id}")
+    public ResponseEntity<ReviewDTO> fetchReviewById(@PathVariable Long id) {
+        logger.info("Received GET request for /api/reviews/{}", id);
+        ReviewDTO reviewDTO = reviewService.getReviewById(id);
+        logger.info("Successfully retrieved review with ID: {}", id);
+        return ResponseEntity.ok(reviewDTO);
     }
 
-    @GetMapping("/allReviews")
-    public ResponseEntity<Page<ReviewDTO>> searchAllReviews(Pageable pageable) {
-
-        logger.info("Received request to fetch all reviews with pagination: page={}, size={}", pageable.getPageNumber(), pageable.getPageSize());
-        try {
-            Page<ReviewDTO> allReviews = reviewService.getAllReviews(pageable);
-            logger.info("Successfully fetched {} reviews", allReviews.getTotalElements());
-            return ResponseEntity.ok(allReviews);
-        } catch (Exception e) {
-            logger.error("Error occurred while fetching all reviews: {}", e.getMessage(), e);
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(null);
-        }
+    @GetMapping
+    public ResponseEntity<Page<ReviewDTO>> fetchAllReviews(@PageableDefault(size = 5) Pageable pageable) {
+        logger.info("GET api/reviews called with pagination: page = {}, size = {}", pageable.getPageNumber(), pageable.getPageSize());
+        Page<ReviewDTO> allReviews = reviewService.getAllReviews(pageable);
+        logger.info("Successfully fetched {} reviews", allReviews.getNumberOfElements());
+        return ResponseEntity.ok(allReviews);
     }
 
     @GetMapping("/reviewRating")
-    public ResponseEntity<Page<ReviewDTO>> searchReviewRating(@RequestParam BigDecimal rating, Pageable pageable) {
-
-        logger.info("Received request to fetch reviews with rating: {}", rating);
-        try {
-            Page<ReviewDTO> searchRating = reviewService.getReviewByRating(rating, pageable);
-            if (searchRating.isEmpty()) {
-                logger.warn("No reviews found with rating: {}", rating);
-            } else {
-                logger.info("Successfully fetched reviews with rating: {}", rating);
-            }
-
-            return ResponseEntity.ok(searchRating);
-        } catch (Exception e) {
-            logger.error("Error occurred while fetching reviews by rating: {}", rating, e);
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(null);
-        }
+    public ResponseEntity<Page<ReviewDTO>> fetchReviewRating(
+            @RequestParam BigDecimal rating,
+            @PageableDefault(size = 5) Pageable pageable) {
+        logger.info("Received request to fetch reviews with rating: {} and pagination: page {}, size {}",
+                rating, pageable.getPageNumber(), pageable.getPageSize());
+        Page<ReviewDTO> searchRating = reviewService.getReviewByRating(rating, pageable);
+        logger.info("Successfully fetched {} reviews with rating: {} on page {}.",
+                searchRating.getTotalElements(), rating, pageable.getPageNumber());
+        return ResponseEntity.ok(searchRating);
     }
 
-    @PutMapping("/updateReview/{id}")
+    @PutMapping("/update/{id}")
     public ResponseEntity<ReviewDTO> updateReview(@PathVariable Long id, @Valid @RequestBody ReviewDTO reviewDTO) {
-
         logger.info("Received request to update review with ID: {}", id);
-        try {
-            ReviewDTO updatedReview = reviewService.updateReview(id, reviewDTO);
-            logger.info("Successfully updated review with ID: {}", id);
-            return ResponseEntity.ok(updatedReview);
-        } catch (Exception e) {
-            logger.error("Error occurred while updating review with ID {}: {}", id, e.getMessage(), e);
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(null);
-        }
+        ReviewDTO updatedReview = reviewService.modifyReview(id, reviewDTO);
+        logger.info("Successfully updated review with ID: {}", id);
+        return ResponseEntity.ok(updatedReview);
     }
 
-    @DeleteMapping("/deleteReview/{id}")
-    public ResponseEntity<String> deleteReview(@PathVariable Long id) {
-
+    @DeleteMapping("/delete/{id}")
+    public ResponseEntity<Void> deleteReview(@PathVariable Long id) {
         logger.info("Received request to delete review with ID: {}", id);
-        try {
-            reviewService.deleteReview(id);
-            logger.info("Successfully deleted review with ID: {}", id);
-            return ResponseEntity.status(HttpStatus.NO_CONTENT).body("Review deleted successfully");
-        } catch (Exception e) {
-            logger.error("Error occurred while deleting review with ID {}: {}", id, e.getMessage(), e);
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body("Error occurred while deleting review");
-        }
+        reviewService.removeReview(id);
+        logger.info("Successfully deleted review with ID: {}", id);
+        return ResponseEntity.noContent().build();
     }
 }
