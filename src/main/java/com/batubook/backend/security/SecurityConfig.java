@@ -19,11 +19,16 @@ public class SecurityConfig {
                 .csrf(AbstractHttpConfigurer::disable)
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers("/api/users/**").permitAll()
-                        .requestMatchers("/api/userProfiles/**").permitAll()
+                        .requestMatchers("/api/user-profiles/**").permitAll()
                         .requestMatchers("/api/books/**").permitAll()
+                        .requestMatchers("/api/book-interactions/**").permitAll()
+                        .requestMatchers("/api/book-sales/**").permitAll()
+                        .requestMatchers("/api/messages/**").permitAll()
                         .requestMatchers("/api/reviews/**").permitAll()
                         .requestMatchers("/api/quotes/**").permitAll()
-                        .requestMatchers("/api/messages/**").permitAll()
+                        .requestMatchers("/api/follows/**").permitAll()
+                        .requestMatchers("/api/likes/**").permitAll()
+                        .requestMatchers("/api/repost-saves/**").permitAll()
                         .requestMatchers("/swagger-ui/**", "/v3/api-docs/**", "/swagger-ui.html").permitAll()
                         .anyRequest().authenticated()
                 );
