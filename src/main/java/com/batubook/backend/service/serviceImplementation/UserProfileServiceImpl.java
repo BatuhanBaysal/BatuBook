@@ -16,6 +16,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
+import java.time.format.DateTimeParseException;
 
 @Service
 @RequiredArgsConstructor
@@ -84,8 +85,7 @@ public class UserProfileServiceImpl implements UserProfileServiceInterface {
             logger.info("User profile updated successfully for ID: {}", id);
             return userProfileMapper.userProfileEntityToDTO(updatedUserProfile);
 
-        } catch (CustomExceptions.NotFoundException e) {
-            logger.error("User Profile not found: {}", e.getMessage());
+        } catch (CustomExceptions.NotFoundException | CustomExceptions.BadRequestException e) {
             throw e;
         } catch (Exception e) {
             logger.error("Error while updating User Profile: {}", e.getMessage());
@@ -108,28 +108,71 @@ public class UserProfileServiceImpl implements UserProfileServiceInterface {
 
     private void modifyUserProfileDetails(UserProfileEntity profile, UserProfileDTO userProfileDTO) {
         if (userProfileDTO.getDateOfBirth() != null) {
-            profile.setDateOfBirth(LocalDate.parse(userProfileDTO.getDateOfBirth()));
-            logger.info("Updated Date of Birth for user profile ID: {}", profile.getId());
+            try {
+                LocalDate dateOfBirth = LocalDate.parse(userProfileDTO.getDateOfBirth());
+                if (dateOfBirth.isAfter(LocalDate.now())) {
+                    logger.error("Date of Birth cannot be in the future.");
+                    throw new CustomExceptions.BadRequestException("Date of Birth cannot be in the future");
+                }
+                profile.setDateOfBirth(dateOfBirth);
+                logger.info("Updated Date of Birth for user profile ID: {}", profile.getId());
+            } catch (DateTimeParseException e) {
+                logger.error("Invalid date format for Date of Birth.");
+                throw new CustomExceptions.BadRequestException("Invalid date format for Date of Birth. Expected format: yyyy-MM-dd");
+            }
         }
+
         if (userProfileDTO.getGender() != null) {
             profile.setGender(userProfileDTO.getGender());
             logger.info("Updated Gender for user profile ID: {}", profile.getId());
         }
-        if (userProfileDTO.getBiography() != null) {
+
+        if (userProfileDTO.getBiography() != null && !userProfileDTO.getBiography().trim().isEmpty()) {
             profile.setBiography(userProfileDTO.getBiography());
             logger.info("Updated Biography for user profile ID: {}", profile.getId());
+        } else if (userProfileDTO.getBiography() != null) {
+            logger.error("Biography cannot be empty.");
+            throw new CustomExceptions.BadRequestException("Biography cannot be empty");
         }
-        if (userProfileDTO.getLocation() != null) {
+
+        if (userProfileDTO.getLocation() != null && !userProfileDTO.getLocation().trim().isEmpty()) {
             profile.setLocation(userProfileDTO.getLocation());
             logger.info("Updated Location for user profile ID: {}", profile.getId());
+        } else if (userProfileDTO.getLocation() != null) {
+            logger.error("Location cannot be empty.");
+            throw new CustomExceptions.BadRequestException("Location cannot be empty");
         }
-        if (userProfileDTO.getOccupation() != null) {
+
+        if (userProfileDTO.getOccupation() != null && !userProfileDTO.getOccupation().trim().isEmpty()) {
             profile.setOccupation(userProfileDTO.getOccupation());
             logger.info("Updated Occupation for user profile ID: {}", profile.getId());
+        } else if (userProfileDTO.getOccupation() != null) {
+            logger.error("Occupation cannot be empty.");
+            throw new CustomExceptions.BadRequestException("Occupation cannot be empty");
         }
-        if (userProfileDTO.getEducation() != null) {
+
+        if (userProfileDTO.getEducation() != null && !userProfileDTO.getEducation().trim().isEmpty()) {
             profile.setEducation(userProfileDTO.getEducation());
             logger.info("Updated Education for user profile ID: {}", profile.getId());
+        } else if (userProfileDTO.getEducation() != null) {
+            logger.error("Education cannot be empty.");
+            throw new CustomExceptions.BadRequestException("Education cannot be empty");
+        }
+
+        if (userProfileDTO.getProfileImageUrl() != null && !userProfileDTO.getProfileImageUrl().trim().isEmpty()) {
+            profile.setProfileImageUrl(userProfileDTO.getProfileImageUrl());
+            logger.info("Updated Image Url for user profile ID: {}", profile.getId());
+        } else if (userProfileDTO.getProfileImageUrl() != null) {
+            logger.error("Profile Image URL cannot be empty.");
+            throw new CustomExceptions.BadRequestException("Profile Image URL cannot be empty");
+        }
+
+        if (userProfileDTO.getInterests() != null && !userProfileDTO.getInterests().trim().isEmpty()) {
+            profile.setInterests(userProfileDTO.getInterests());
+            logger.info("Updated Interests for user profile ID: {}", profile.getId());
+        } else if (userProfileDTO.getInterests() != null) {
+            logger.error("Interests cannot be empty.");
+            throw new CustomExceptions.BadRequestException("Interests cannot be empty");
         }
     }
 }
