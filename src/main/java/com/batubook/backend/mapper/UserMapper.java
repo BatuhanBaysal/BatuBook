@@ -9,11 +9,9 @@ import org.mapstruct.Mapping;
         uses = { UserProfileMapper.class, QuoteMapper.class, ReviewMapper.class, MessageMapper.class })
 public interface UserMapper {
 
-    @Mapping(target = "password", ignore = true)
     @Mapping(target = "role", source = "role")
     UserDTO userEntityToDTO(UserEntity userEntity);
 
-    @Mapping(target = "password", ignore = true)
     @Mapping(target = "role", source = "role")
     UserEntity userDTOToEntity(UserDTO userDTO);
 }
