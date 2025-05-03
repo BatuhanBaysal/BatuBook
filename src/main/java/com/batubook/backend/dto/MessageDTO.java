@@ -16,6 +16,7 @@ public class MessageDTO {
     private String messageContent;
     private Long senderId;
     private Long receiverId;
+    private Long interactionId;
     private Long reviewId;
     private Long quoteId;
     private MessageType messageType;
