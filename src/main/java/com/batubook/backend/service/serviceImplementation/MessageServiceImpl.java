@@ -1,17 +1,11 @@
 package com.batubook.backend.service.serviceImplementation;
 
 import com.batubook.backend.dto.MessageDTO;
-import com.batubook.backend.entity.MessageEntity;
-import com.batubook.backend.entity.QuoteEntity;
-import com.batubook.backend.entity.ReviewEntity;
-import com.batubook.backend.entity.UserEntity;
+import com.batubook.backend.entity.*;
 import com.batubook.backend.entity.enums.MessageType;
 import com.batubook.backend.exception.CustomExceptions;
 import com.batubook.backend.mapper.MessageMapper;
-import com.batubook.backend.repository.MessageRepository;
-import com.batubook.backend.repository.QuoteRepository;
-import com.batubook.backend.repository.ReviewRepository;
-import com.batubook.backend.repository.UserRepository;
+import com.batubook.backend.repository.*;
 import com.batubook.backend.service.serviceInterface.MessageServiceInterface;
 import lombok.RequiredArgsConstructor;
 import org.slf4j.Logger;
@@ -32,6 +26,7 @@ public class MessageServiceImpl implements MessageServiceInterface {
     private final UserRepository userRepository;
     private final ReviewRepository reviewRepository;
     private final QuoteRepository quoteRepository;
+    private final BookInteractionRepository interactionRepository;
 
     @Override
     @Transactional
@@ -144,8 +139,8 @@ public class MessageServiceImpl implements MessageServiceInterface {
         if (messageType == MessageType.PERSONAL && receiverId == null) {
             throw new CustomExceptions.BadRequestException("Receiver is required for PERSONAL message type");
         }
-        if ((messageType == MessageType.REVIEW || messageType == MessageType.QUOTE) && receiverId != null) {
-            throw new CustomExceptions.BadRequestException("Receiver should be null for REVIEW or QUOTE message type");
+        if ((messageType == MessageType.REVIEW || messageType == MessageType.QUOTE || messageType == MessageType.BOOK) && receiverId != null) {
+            throw new CustomExceptions.BadRequestException("Receiver should be null for REVIEW or QUOTE or INTERACTION message type");
         }
         if (receiverId != null) {
             return userRepository.findById(receiverId)
@@ -163,6 +158,10 @@ public class MessageServiceImpl implements MessageServiceInterface {
             QuoteEntity quote = quoteRepository.findById(messageDTO.getQuoteId())
                     .orElseThrow(() -> new CustomExceptions.NotFoundException("Quote not found with ID: " + messageDTO.getQuoteId()));
             messageEntity.setQuote(quote);
+        } else if (messageDTO.getMessageType() == MessageType.BOOK && messageDTO.getInteractionId() != null) {
+            BookInteractionEntity interaction = interactionRepository.findById(messageDTO.getInteractionId())
+                    .orElseThrow(() -> new CustomExceptions.NotFoundException("Interaction not found with ID: " + messageDTO.getInteractionId()));
+            messageEntity.setBookInteraction(interaction);
         }
     }
 
